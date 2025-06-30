@@ -1,0 +1,13 @@
+.theme-intelligent {
+  --primary: 222 83% 53% !important; /* Tailwind blue-600 */
+  --primary-foreground: 0 0% 100% !important;
+}
+.theme-least-cost {
+  --primary: 262 83% 58% !important; /* Tailwind purple-600 */
+  --primary-foreground: 0 0% 100% !important;
+  --sidebar-primary: 262 83% 58%; /* Purple for sidebar icons */
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 262 83% 68%; /* Lighter purple for accent */
+  --sidebar-ring: 262 83% 58%;
+  --chart-5: 262 83% 58%; /* Purple for chart icons/lines */
+} 

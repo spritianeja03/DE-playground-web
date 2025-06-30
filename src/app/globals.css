@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 207 90% 54%; 
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 271 95% 75%; 
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --input-border: 0 0% 80%; /* Added for flat input border */
+    --ring: 207 90% 54%; 
+    --radius: 0.5rem; /* Slightly less rounded for flat */
+
+    --chart-1: 44 96% 51%; /* Lime */
+    --chart-2: 218 57% 54%; /* Cyan */
+    --chart-3: 354 70% 50%; /* Rose */
+    --chart-4: 112 16% 52%; /* Amber */
+    --chart-5: 274 74% 66%; /* Violet */
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 207 90% 54%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 271 95% 75%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 207 90% 54%;
+  }
+
+  .dark {
+    /* Black Theme - Flat Design */
+    --background: 220 10% 4%;    /* Very dark blue-gray, almost black */
+    --foreground: 0 0% 95%;       /* Light gray for text */
+    
+    --card: 220 10% 8%;          /* Slightly lighter dark blue-gray for cards */
+    --card-foreground: 0 0% 95%;
+    
+    --popover: 220 10% 10%;       /* Darker popover */
+    --popover-foreground: 0 0% 95%;
+    
+    --primary: 207 90% 58%;       /* Vibrant Blue */
+    --primary-foreground: 0 0% 100%;  /* White */
+    
+    --secondary: 220 10% 15%;      /* A bit lighter for secondary elements */
+    --secondary-foreground: 0 0% 90%;
+    
+    --muted: 220 10% 12%;         /* Muted elements */
+    --muted-foreground: 0 0% 60%; 
+    
+    --accent: 271 80% 65%;        /* Electric Purple */
+    --accent-foreground: 0 0% 100%; 
+    
+    --destructive: 0 70% 50%;   
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 220 10% 18%;         /* Subtle border color */
+    --input: 220 10% 10%;         /* Input background, similar to card or slightly different */
+    --input-border: 220 10% 20%;  /* Border for input */
+    
+    --ring: 207 90% 58%;       
+
+    /* Sci-fi Chart Colors (can remain distinct or be adjusted for black theme) */
+    --chart-1: 44 96% 51%;    /* Stripe - Vibrant Orange */
+    --chart-2: 218 57% 54%;      /* Adyen - Cyan */
+    --chart-3: 354 70% 50%;    /* Paypal - Rose */
+    --chart-4: 112 16% 52%;   /* Worldpay - Muted Amber */
+    --chart-5: 274 74% 66%;     /* Checkout - Violet */
+    
+    --sidebar-background: 220 10% 8%; /* Dark sidebar */
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 207 90% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 271 80% 65%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 10% 15%;
+    --sidebar-ring: 207 90% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1,"calt" 1;
+  }
+}
+
+/* SplitPane splitter styles */
+.SplitPane .Resizer {
+  background: #222;
+  opacity: 0.5;
+  z-index: 1;
+  box-sizing: border-box;
+  background-clip: padding-box;
+  transition: background 0.2s;
+}
+.SplitPane .Resizer:hover {
+  background: #666;
+}
+.SplitPane .Resizer.vertical {
+  width: 6px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  border-left: 1px solid #444;
+  border-right: 1px solid #444;
+}
+.SplitPane .Resizer.horizontal {
+  height: 6px;
+  margin: -3px 0;
+  cursor: row-resize;
+  border-top: 1px solid #444;
+  border-bottom: 1px solid #444;
+}
+.SplitPane .Resizer:after {
+  content: '';
+  display: block;
+  margin: 0 auto;
+  width: 24px;
+  height: 24px;
+  background: url('data:image/svg+xml;utf8,<svg fill="gray" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M9 18l6-6-6-6"/></svg>') center center no-repeat;
+  opacity: 0.3;
+}
+
+/* --- Fix for code block and container cropping issues --- */
+pre, code {
+  white-space: pre;
+  overflow-x: auto;
+  display: block;
+  max-width: 100%;
+}
+
+/* Ensure form containers and input wrappers are responsive */
+.w-full, .max-w-full, .form-container, .input-wrapper {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Prevent heading and label cropping */
+.font-semibold, .font-medium, .form-label, .form-title {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
