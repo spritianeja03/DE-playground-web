@@ -138,6 +138,6 @@ export interface TransactionLogEntry {
   status: string; // e.g., "succeeded", "failed", "pending"
   connector: string; // The connector used for the transaction
   timestamp: number; 
-  routingApproach?: 'exploration' | 'exploitation' | 'unknown' | 'N/A'; 
+  routingApproach?: 'exploration' | 'exploitation' | 'default' | 'unknown' | 'N/A'; 
   sr_scores?: Record<string, number>; 
 }

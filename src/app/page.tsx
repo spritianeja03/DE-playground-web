@@ -101,8 +101,6 @@ export default function HomePage() {
       }
     };
 
-    console.log("[updateRuleConfiguration] Payload:", JSON.stringify(payload, null, 2));
-
     try {
       const response = await fetch('/api/hs-proxy/rule/update', {
         method: 'POST',
@@ -249,8 +247,6 @@ export default function HomePage() {
       }
     };
 
-    console.log("[decideGateway] Payload:", JSON.stringify(payload, null, 2));
-
     try {
       const response = await fetch('/api/hs-proxy/decide-gateway', {
         method: 'POST',
@@ -288,11 +284,10 @@ export default function HomePage() {
         }, {});
       }
 
-      if (data.routing_approach === 'SR_SELECTION_V3_ROUTING') {
-        routingApproachForLog = 'exploitation';
-      } else {
-        routingApproachForLog = 'exploration'; // Or any other appropriate default/mapping
-      }
+      // let routingApproachForLog: TransactionLogEntry['routingApproach'] = 'unknown';
+      routingApproachForLog = data.routing_approach === 'SR_SELECTION_V3_ROUTING' ? 'exploitation' 
+                   : data.routing_approach === 'SR_V3_HEDGING' ? 'exploration'
+                   : 'default';
       console.log(`[decideGateway] Determined routing approach: ${routingApproachForLog}`);
 
       if (data.decided_gateway && srScoresForLog && srScoresForLog[data.decided_gateway] !== undefined) {
