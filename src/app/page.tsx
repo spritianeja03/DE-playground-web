@@ -9,20 +9,17 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { StatsView } from '@/components/StatsView';
 import { AnalyticsGraphsView } from '@/components/AnalyticsGraphsView';
-// import { ProcessorsTabView } from '@/components/ProcessorsTabView'; // Tab removed
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react'; // AI Summary Re-added
+import { Loader2 } from 'lucide-react'; 
 import ReactMarkdown from 'react-markdown';
 import type { PaymentMethod, ProcessorMetricsHistory, StructuredRule, ControlsState, OverallSRHistory, OverallSRHistoryDataPoint, TimeSeriesDataPoint, MerchantConnector, TransactionLogEntry, AISummaryInput, AISummaryOutput } from '@/lib/types';
-import { PAYMENT_METHODS, /*RULE_STRATEGY_NODES*/ } from '@/lib/constants'; // RULE_STRATEGY_NODES removed
+import { PAYMENT_METHODS} from '@/lib/constants'; 
 import { useToast } from '@/hooks/use-toast';
-import { summarizeSimulation } from '@/ai/flows/summarize-simulation-flow'; // AI Summary Re-added
+import { summarizeSimulation } from '@/ai/flows/summarize-simulation-flow';
 import SplitPane from 'react-split-pane';
 import { MiniSidebar } from '@/components/MiniSidebar';
-
-const SIMULATION_INTERVAL_MS = 50; // Interval between individual payment processing attempts
 
 const LOCALSTORAGE_API_KEY = 'hyperswitch_apiKey';
 const LOCALSTORAGE_PROFILE_ID = 'hyperswitch_profileId';
@@ -34,19 +31,6 @@ interface SinglePaymentOutcome {
   routedProcessorId: string | null;
   logEntry: TransactionLogEntry | null;
 }
-
-// The PaymentResult interface seems unused or was intended for a different structure.
-// If it's confirmed unused elsewhere, it could be removed. For now, keeping it commented.
-// interface PaymentResult {
-//   success: boolean;
-//   connector: string | null;
-//   routingApproach: TransactionLogEntry['routingApproach'];
-//   srScores: Record<string, number> | undefined;
-//   transactionNumber: number;
-//   status: string;
-//   timestamp: number;
-//   routedProcessorId: string | null;
-// }
 
 export default function HomePage() {
   const [currentControls, setCurrentControls] = useState<FormValues | null>(null);
@@ -82,7 +66,7 @@ export default function HomePage() {
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
   const [summaryText, setSummaryText] = useState<string>('');
   const [isSummarizing, setIsSummarizing] = useState<boolean>(false);
-  const [summaryAttempted, setSummaryAttempted] = useState<boolean>(false); // New state
+  const [summaryAttempted, setSummaryAttempted] = useState<boolean>(false); 
 
 
   const { toast } = useToast();
@@ -108,10 +92,9 @@ export default function HomePage() {
           defaultHedgingPercent: 5,
           subLevelInputConfig: [
             {
-              // paymentMethodType: "card",
               paymentMethod: "card",
               bucketSize: bucketSize,
-              hedgingPercent: explorationPercent // Assuming explorationPercent is 0-100, convert to 0-1
+              hedgingPercent: explorationPercent 
             }
           ]
         }
@@ -152,8 +135,7 @@ export default function HomePage() {
 
   const prevControlsRef = useRef<FormValues | null>(null);
 
-  // Top-level tab: 'intelligent-routing' or 'least-cost-routing'
-  const [parentTab, setParentTab] = useState<'intelligent-routing' | 'least-cost-routing'>('intelligent-routing');
+  const [parentTab, setParentTab] = useState<'intelligent-routing'>('intelligent-routing');
   // Content tab: 'stats' or 'analytics', always reset to 'stats' when parentTab changes
   const [contentTab, setContentTab] = useState<'stats' | 'analytics'>('stats');
 
@@ -192,7 +174,6 @@ export default function HomePage() {
       // or if the user closes it and they were already valid, subsequent actions might trigger it.
       // For now, we don't auto-fetch here to ensure modal interaction.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
   useEffect(() => {
@@ -220,110 +201,20 @@ export default function HomePage() {
         }
       }
       prevControlsRef.current = currentControls;
-    }, 900); // Debounce for 500ms
+    }, 900); // Debounce for 900ms
 
     return () => {
       clearTimeout(handler);
     };
   }, [currentControls, merchantId, updateRuleConfiguration]);
 
-  // Function to fetch success rates and select the best connector
-  const fetchSuccessRateAndSelectConnector = useCallback(async (
-    currentControls: FormValues,
-    activeConnectorLabels: string[], // Changed to expect an array of connector_name
-    currentApiKey: string, // Still needed for other API calls, but not for this one as per user
-    currentProfileId: string
-  ): Promise<{ selectedConnector: string | null; routingApproach: TransactionLogEntry['routingApproach']; srScores: Record<string, number> | undefined }> => {
-    if (!currentControls || activeConnectorLabels.length === 0 || !currentProfileId) { // Removed currentApiKey from check as it's not used here
-      console.warn("[FetchSuccessRate] Missing required parameters (controls, labels, or profileId).");
-      return { selectedConnector: null, routingApproach: 'unknown', srScores: undefined };
-    }
-
-    const payload = {
-      id: currentProfileId,
-      params: "card",
-      labels: activeConnectorLabels, // Use the provided connector_names
-      config: { // Specific config for FetchSuccessRate
-        min_aggregates_size: currentControls.minAggregatesSize ?? 5, // Using the new form value
-        default_success_rate: 100.0, // Removed as per previous changes
-        exploration_percent: currentControls.explorationPercent ?? 20.0,
-        // max_aggregates_size and current_block_threshold are NOT included here
-      },
-    };
-
-    console.log("[FetchSuccessRate] Payload:", JSON.stringify(payload, null, 2));
-
-    try {
-      const response = await fetch('/api/hs-proxy/dynamic-routing/success_rate.SuccessRateCalculator/FetchSuccessRate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-feature': 'dynamo', // As per original cURL
-          // api-key is intentionally omitted as per user feedback for this specific endpoint
-        },
-        body: JSON.stringify(payload),
-      });
-
-      let routingApproachForLog: TransactionLogEntry['routingApproach'] = 'unknown';
-
-      // The following block was erroneously inserted here and is being removed.
-      // if (profileId && connectorNameForUpdateApi && currentControls) { 
-      //   await updateSuccessRateWindow(profileId, connectorNameForUpdateApi!, isSuccess, currentControls); 
-      // } else {
-      //   console.warn("[PTB] Skipping UpdateSuccessRateWindow call due to missing profileId, connectorName, or currentControls.");
-      // }
-
-      const data = await response.json();
-      console.log("[FetchSuccessRate] Response Data:", data);
-
-      let srScoresForLog: Record<string, number> | undefined = undefined;
-      if (data.labels_with_score && Array.isArray(data.labels_with_score)) {
-        srScoresForLog = data.labels_with_score.reduce((acc: Record<string, number>, item: any) => {
-          if (item && typeof item.label === 'string' && typeof item.score === 'number') {
-            acc[item.label] = parseFloat(item.score.toFixed(2)); // Keep scores with 2 decimal places
-          }
-          return acc;
-        }, {});
-      }
-
-      if (typeof data.routing_approach === 'number') {
-        if (data.routing_approach === 0) {
-          routingApproachForLog = 'exploration';
-        } else if (data.routing_approach === 1) {
-          routingApproachForLog = 'exploitation';
-        }
-      }
-      console.log(`[FetchSuccessRate] Determined routing approach: ${routingApproachForLog}`);
-
-
-      if (data.labels_with_score && data.labels_with_score.length > 0) {
-        // Sort connectors by score in descending order
-        // const sortedConnectors = data.labels_with_score.sort((a: any, b: any) => b.score - a.score);
-        const bestConnector = data.labels_with_score[0]; // Pick the first one (highest score)
-
-        console.log(`[FetchSuccessRate] Selected connector: ${bestConnector.label} with score ${bestConnector.score}`);
-        return { selectedConnector: bestConnector.label, routingApproach: routingApproachForLog, srScores: srScoresForLog };
-      } else {
-        console.warn("[FetchSuccessRate] No scores returned or empty list.");
-        toast({ title: "Fetch Success Rate Info", description: "No connector scores returned by the API." });
-        return { selectedConnector: null, routingApproach: routingApproachForLog, srScores: srScoresForLog };
-      }
-    } catch (error: any) {
-      console.error("[FetchSuccessRate] Fetch Error:", error);
-      toast({ title: "Fetch Success Rate Network Error", description: error.message, variant: "destructive" });
-      return { selectedConnector: null, routingApproach: 'unknown', srScores: undefined };
-    }
-  }, [toast]);
-
   const decideGateway = useCallback(async (
     currentControls: FormValues,
-    activeConnectorLabels: string[], // Changed to expect an array of connector_name
-    currentApiKey: string, // Still needed for other API calls, but not for this one as per user
+    activeConnectorLabels: string[], 
     currentMerchantId: string,
-    paymentId: string // Added paymentId to the parameters
+    paymentId: string 
   ): Promise<{ selectedConnector: string | null; routingApproach: TransactionLogEntry['routingApproach']; srScores: Record<string, number> | undefined }> => {
-    if (!currentControls || activeConnectorLabels.length === 0 || !currentMerchantId) { // Removed currentApiKey from check as it's not used here
+    if (!currentControls || activeConnectorLabels.length === 0 || !currentMerchantId) { 
       console.warn("[decideGateway] Missing required parameters (controls, labels, or merchantId).");
       return { selectedConnector: null, routingApproach: 'unknown', srScores: undefined };
     }
@@ -388,7 +279,6 @@ export default function HomePage() {
           }
         }
       }
-      // console.log("[decideGateway] Converted gatewayPriorityArray:", gatewayPriorityArray);
 
       let srScoresForLog: Record<string, number> | undefined = undefined;
       if (gatewayPriorityArray.length > 0) {
@@ -413,7 +303,6 @@ export default function HomePage() {
         return { selectedConnector: bestConnectorName, routingApproach: routingApproachForLog, srScores: srScoresForLog };
       } else if (data.decided_gateway) {
         console.warn(`[decideGateway] decided_gateway '${data.decided_gateway}' not found in processed scores or scores are missing.`);
-        // Return the decided_gateway name; srScoresForLog might be incomplete or the specific score missing
         return { selectedConnector: data.decided_gateway, routingApproach: routingApproachForLog, srScores: srScoresForLog };
       } else {
         console.warn("[decideGateway] No decided_gateway returned or gateway_priority_map was empty/invalid.");
@@ -469,7 +358,6 @@ export default function HomePage() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: "Failed to update success rate window" }));
         console.error("[UpdateSuccessRateWindow] API Error:", errorData.message || `HTTP ${response.status}`);
-        // toast({ title: "Update SR Window Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
       } else {
         const responseDataText = await response.text();
         if (responseDataText.trim() === "Success") {
@@ -490,148 +378,8 @@ export default function HomePage() {
       }
     } catch (error: any) {
       console.error("[UpdateSuccessRateWindow] Fetch Error:", error);
-      // toast({ title: "Update SR Window Network Error", description: error.message, variant: "destructive" });
     }
   }, [toast]);
-
-  const updateSuccessRateWindow = useCallback(async (
-    currentProfileId: string,
-    connectorNameForApi: string, // This should be the connector_name
-    paymentSuccessStatus: boolean,
-    controls: FormValues | null // Pass currentControls to access config values
-  ) => {
-    if (!currentProfileId || !connectorNameForApi) {
-      console.warn("[UpdateSuccessRateWindow] Missing profileId or connectorName.");
-      return;
-    }
-    if (!controls) {
-      console.warn("[UpdateSuccessRateWindow] Missing controls data, cannot construct config.");
-      return;
-    }
-
-    const payload = {
-      id: currentProfileId,
-      params: "card", // Assuming "card" for now
-      labels_with_status: [{ label: connectorNameForApi, status: paymentSuccessStatus }],
-      global_labels_with_status: [{ label: connectorNameForApi, status: paymentSuccessStatus }],
-      config: { // Added config for UpdateSuccessRateWindow
-        max_aggregates_size: controls.maxAggregatesSize ?? 10, // Using the new form value
-        current_block_threshold: { // This remains as per its original structure
-          duration_in_mins: controls.currentBlockThresholdDurationInMins ?? 60,
-          max_total_count: controls.currentBlockThresholdMaxTotalCount ?? 20,
-        }
-      }
-    };
-
-    console.log("[UpdateSuccessRateWindow] Payload:", JSON.stringify(payload, null, 2));
-
-    try {
-      const response = await fetch('/api/hs-proxy/dynamic-routing/success_rate.SuccessRateCalculator/UpdateSuccessRateWindow', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-feature': 'dynamo',
-          // 'api-key': apiKey, // Not needed for this endpoint as per user
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Failed to update success rate window" }));
-        console.error("[UpdateSuccessRateWindow] API Error:", errorData.message || `HTTP ${response.status}`);
-        // toast({ title: "Update SR Window Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
-      } else {
-        const responseDataText = await response.text(); // Get text first to avoid issues with empty/non-JSON
-        console.log(`[UpdateSuccessRateWindow] Response text for ${connectorNameForApi}:`, responseDataText);
-        try {
-          const updateData = responseDataText ? JSON.parse(responseDataText) : null;
-          if (updateData && typeof updateData.status === 'number') {
-            if (updateData.status === 0) {
-              console.log(`[UpdateSuccessRateWindow] API reported success (status 0) for connector ${connectorNameForApi}. Full response:`, updateData);
-            } else if (updateData.status === 1) {
-              console.warn(`[UpdateSuccessRateWindow] API reported failure (status 1) for connector ${connectorNameForApi}. Full response:`, updateData);
-              // Optionally, you might want a toast here if status 1 is an actionable error
-              // toast({ title: "Update SR Window Issue", description: `API reported failure (status 1) for ${connectorNameForApi}.`, variant: "warning" });
-            } else {
-              console.log(`[UpdateSuccessRateWindow] HTTP call successful for ${connectorNameForApi}, but API status is unexpected: ${updateData.status}. Full response:`, updateData);
-            }
-          } else if (response.status === 204 || !responseDataText) { // Handle 204 No Content or genuinely empty responses
-            console.log(`[UpdateSuccessRateWindow] Successfully called for connector ${connectorNameForApi} (HTTP ${response.status}, No Content/Empty Response).`);
-          } else {
-            console.log(`[UpdateSuccessRateWindow] HTTP call successful for ${connectorNameForApi}, but response was not JSON or status field missing. Response text:`, responseDataText);
-          }
-        } catch (jsonParseError) {
-          console.error(`[UpdateSuccessRateWindow] Failed to parse JSON response for ${connectorNameForApi}. HTTP Status: ${response.status}. Response text:`, responseDataText, jsonParseError);
-        }
-      }
-    } catch (error: any) {
-      console.error("[UpdateSuccessRateWindow] Fetch Error:", error);
-      // toast({ title: "Update SR Window Network Error", description: error.message, variant: "destructive" });
-    }
-  }, [toast]);
-
-
-  // This useEffect is no longer needed as the initial modal opening is handled by the mount effect
-  // useEffect(() => {
-  //   if (!apiKey && !profileId && !merchantId) {
-  //     setIsApiCredentialsModalOpen(true);
-  //   }
-  // }, [apiKey, profileId, merchantId]);
-
-  // const prevCurrentControlsRef = useRef<FormValues | null>(null); // Removed as the useEffect using it is removed
-
-  // useEffect(() => { // This useEffect has been moved to BottomControlsPanel.tsx
-  //   const prevControls = prevCurrentControlsRef.current;
-  //   const currentRuleEnabled = currentControls?.isSuccessBasedRoutingEnabled; 
-  //   const prevRuleEnabled = prevControls?.isSuccessBasedRoutingEnabled;
-
-  //   if (currentRuleEnabled === true && (prevRuleEnabled === false || prevRuleEnabled === undefined)) {
-  //     // Rule was just toggled from false or undefined to true
-  //     if (merchantId && profileId && apiKey) {
-  //       const apiUrl = `https://sandbox.hyperswitch.io/account/${merchantId}/business_profile/${profileId}/dynamic_routing/set_volume_split?split=100`;
-
-  //       console.log(`Success rate rule enabled. Calling: POST ${apiUrl}`);
-
-  //       fetch(apiUrl, {
-  //         method: 'POST',
-  //         headers: {
-  //           'api-key': apiKey,
-  //         },
-  //         // No body for this specific cURL
-  //       })
-  //       .then(async response => {
-  //         if (!response.ok) {
-  //           let errorDetail = `HTTP error! status: ${response.status}`;
-  //           try {
-  //             // Attempt to get more detailed error message if API returns JSON error
-  //             const errorData = await response.json();
-  //             errorDetail = errorData.message || JSON.stringify(errorData) || errorDetail;
-  //           } catch (e) {
-  //             // If parsing JSON fails, stick with the status text or get response text
-  //             const textError = await response.text().catch(() => "");
-  //             errorDetail = textError || errorDetail;
-  //           }
-  //           console.error("Failed to set volume split:", errorDetail);
-  //           toast({ title: "API Error", description: `Failed to set volume split: ${errorDetail}`, variant: "destructive" });
-  //           return; 
-  //         }
-  //         // If response.ok is true, assume success even with no body
-  //         console.log("Successfully set volume split. Status:", response.status);
-  //         toast({ title: "Success", description: "Dynamic routing volume split set." });
-  //       })
-  //       .catch(error => {
-  //         console.error("Error setting volume split (fetch catch):", error);
-  //         toast({ title: "Network Error", description: `Could not set volume split: ${error.message}`, variant: "destructive" });
-  //       });
-  //     } else {
-  //       console.warn("Cannot set volume split: API credentials (merchantId, profileId, apiKey) are missing.");
-  //       toast({ title: "Configuration Error", description: "API credentials missing, cannot set volume split.", variant: "destructive" });
-  //     }
-  //   }
-
-  //   prevCurrentControlsRef.current = currentControls;
-  // }, [currentControls, merchantId, profileId, apiKey, toast]);
 
   const handleControlsChange = useCallback((data: FormValues) => {
     setCurrentControls(prev => {
@@ -806,11 +554,6 @@ export default function HomePage() {
           totalPayments: 100,
           selectedPaymentMethods: [...PAYMENT_METHODS],
           structuredRule: null,
-          // defaultSuccessRate: 100, // Removed
-          currentBlockThresholdDurationInMins: 15, // Old field, kept for now if UI still uses it directly
-          currentBlockThresholdMaxTotalCount: 5,  // Old field, kept for now
-          minAggregatesSize: 5, // New field default
-          maxAggregatesSize: 10, // New field default
           processorMatrix: {},
           processorIncidents: {},
           processorWiseSuccessRates: {},
@@ -920,13 +663,8 @@ export default function HomePage() {
           totalPayments: 1000, selectedPaymentMethods: [...PAYMENT_METHODS], processorMatrix: {},
           processorIncidents: {}, overallSuccessRate: 0, processorWiseSuccessRates: {},
           structuredRule: null,
-          // defaultSuccessRate: 90, // Removed
-          currentBlockThresholdDurationInMins: 5, // Old field
-          currentBlockThresholdMaxTotalCount: 10, // Old field
-          minAggregatesSize: 5, // New field default
-          maxAggregatesSize: 10, // New field default
-          numberOfBatches: 100, // New batch processing field
-          batchSize: 10, // New batch processing field
+          numberOfBatches: 100, 
+          batchSize: 10, 
           isSuccessBasedRoutingEnabled: true, // Default to true
         } as FormValues;
       }
@@ -969,7 +707,6 @@ export default function HomePage() {
         const decisionResult = await decideGateway(
           currentControls,
           activeConnectorLabels,
-          apiKey,
           merchantId,
           paymentId // Pass the generated paymentId
         );
@@ -1118,15 +855,7 @@ export default function HomePage() {
         if (mc) routedProcessorId = mc.merchant_connector_id || mc.connector_name;
         else routedProcessorId = loggedConnectorName;
       }
-      
-      // Update success rate window
-      // if (profileId && loggedConnectorName !== 'unknown') {
-      //   const foundConnector = merchantConnectors.find(mc =>
-      //     mc.connector_name === loggedConnectorName || mc.merchant_connector_id === loggedConnectorName
-      //   );
-      //   const connectorNameForUpdate = foundConnector ? foundConnector.connector_name : loggedConnectorName;
-      //   await updateSuccessRateWindow(profileId, connectorNameForUpdate, isSuccess, currentControls);
-      // }
+
       if (merchantId && loggedConnectorName !== 'unknown') {
         const foundConnector = merchantConnectors.find(mc =>
           mc.connector_name === loggedConnectorName || mc.merchant_connector_id === loggedConnectorName
@@ -1142,7 +871,7 @@ export default function HomePage() {
     }
 
     return { isSuccess, routedProcessorId, logEntry };
-  }, [currentControls, apiKey, profileId, merchantId, merchantConnectors, connectorToggleStates, fetchSuccessRateAndSelectConnector, updateSuccessRateWindow,updateGatewayScore,decideGateway]);
+  }, [currentControls, apiKey, profileId, merchantId, merchantConnectors, connectorToggleStates, updateGatewayScore, decideGateway]);
 
   const getCarddetailsForPayment = (currentControls: FormValues, connectorNameToUse: string): any => {
     let cardDetailsToUse;
@@ -1393,7 +1122,7 @@ export default function HomePage() {
     currentControls, simulationState, apiKey, profileId, merchantId, merchantConnectors, connectorToggleStates,
     processedPaymentsCount, setProcessedPaymentsCount, setSuccessRateHistory, setVolumeHistory,
     setOverallSuccessRateHistory, setSimulationState, setCurrentControls, toast,
-    fetchSuccessRateAndSelectConnector, updateSuccessRateWindow // Added dependencies
+    // Added dependencies
   ]);
 
   useEffect(() => {
@@ -1434,11 +1163,6 @@ export default function HomePage() {
         totalPayments: 1000, selectedPaymentMethods: [...PAYMENT_METHODS], processorMatrix: initialPm,
         structuredRule: null, processorIncidents: initialPi, overallSuccessRate: 0,
         processorWiseSuccessRates: initialPwsr,
-        // defaultSuccessRate: 90, // Removed
-        currentBlockThresholdDurationInMins: 5, // Old field
-        currentBlockThresholdMaxTotalCount: 10, // Old field
-        minAggregatesSize: 5, // New field default
-        maxAggregatesSize: 10, // New field default
         numberOfBatches: 100, // New batch processing field
         batchSize: 10, // New batch processing field
         connectorWiseFailurePercentage: {}, // Initialize empty
@@ -1570,10 +1294,10 @@ export default function HomePage() {
   return (
     <>
       <AppLayout>
-        <div className={parentTab === 'least-cost-routing' ? 'theme-least-cost' : 'theme-intelligent'}>
+        <div className={parentTab === 'intelligent-routing' ? 'theme-intelligent' : ''}>
           <Header
             activeTab={parentTab}
-            onTabChange={tab => setParentTab(tab as 'intelligent-routing' | 'least-cost-routing')}
+            onTabChange={tab => setParentTab(tab as 'intelligent-routing')}
             onStartSimulation={handleStartSimulation} onPauseSimulation={handlePauseSimulation}
             onStopSimulation={handleStopSimulation} simulationState={simulationState}
           />

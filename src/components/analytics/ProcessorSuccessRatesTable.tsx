@@ -23,7 +23,6 @@ export function ProcessorSuccessRatesTable({ data }: ProcessorSuccessRatesTableP
         <Accordion type="multiple" className="w-full">
           {data.map((item) => {
             const failedPaymentCount = item.totalPaymentCount - item.successfulPaymentCount;
-            const failureRate = item.totalPaymentCount > 0 ? (failedPaymentCount / item.totalPaymentCount) * 100 : 0;
             return (
               <AccordionItem value={item.processor} key={item.processor}>
                 <AccordionTrigger>

@@ -25,9 +25,9 @@ export function OverallSuccessRateDisplay({ rate, history }: OverallSuccessRateD
           Based on current simulation parameters
         </p>
         {hasEnoughDataForChart ? (
-          <div className="h-[80px] w-full mt-2"> {/* Adjusted height */}
+          <div className="h-[80px] w-full mt-2"> 
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={history} margin={{ top: 5, right: 0, left: -55, bottom: 0 }}> {/* Adjusted left margin for YAxis */}
+              <LineChart data={history} margin={{ top: 5, right: 0, left: -55, bottom: 0 }}> 
                 <YAxis 
                   hide={false} // Show YAxis
                   domain={[0, 100]} 
@@ -42,7 +42,7 @@ export function OverallSuccessRateDisplay({ rate, history }: OverallSuccessRateD
                     border: '1px solid hsl(var(--border))',
                     borderRadius: 'var(--radius)',
                     color: 'hsl(var(--popover-foreground))',
-                    fontSize: '0.75rem', // text-xs
+                    fontSize: '0.75rem', 
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -2px rgba(0,0,0,.1)'
                   }}
                   itemStyle={{ color: 'hsl(var(--popover-foreground))' }}

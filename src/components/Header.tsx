@@ -1,4 +1,4 @@
-import { PlayCircle, Loader2, PauseCircle, StopCircle, BarChartHorizontalBig, LineChart, Sun, Moon } from 'lucide-react'; // Removed Zap
+import { PlayCircle, Loader2, PauseCircle, StopCircle } from 'lucide-react'; // Removed Zap
 import { Button } from '@/components/ui/button';
 import { TabsList, TabsTrigger, Tabs } from '@/components/ui/tabs';
 import { useEffect, useState } from 'react';
@@ -23,17 +23,6 @@ export function Header({
   const isSimulating = simulationState === 'running';
   const isPaused = simulationState === 'paused';
   const isIdle = simulationState === 'idle';
-
-  // Theme toggle state
-  const [isDark, setIsDark] = useState(true);
-
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
 
   return (
     <header className="p-4 border-b border-border flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur-sm z-10">
@@ -61,7 +50,6 @@ export function Header({
         <Tabs value={activeTab} onValueChange={onTabChange} className="">
           <TabsList>
             <TabsTrigger value="intelligent-routing">Intelligent Routing</TabsTrigger>
-            {/* <TabsTrigger value="least-cost-routing">Least Cost Routing</TabsTrigger> */}
           </TabsList>
         </Tabs>
       </div>
