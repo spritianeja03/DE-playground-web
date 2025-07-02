@@ -18,7 +18,7 @@ import type { PaymentMethod, ProcessorMetricsHistory, StructuredRule, ControlsSt
 import { PAYMENT_METHODS} from '@/lib/constants'; 
 import { useToast } from '@/hooks/use-toast';
 import { summarizeSimulation } from '@/ai/flows/summarize-simulation-flow';
-import SplitPane from 'react-split-pane';
+import SplitPane from 'react-split-pane-next';
 import { MiniSidebar } from '@/components/MiniSidebar';
 
 const LOCALSTORAGE_API_KEY = 'hyperswitch_apiKey';
@@ -133,8 +133,8 @@ export default function HomePage() {
 
   const prevControlsRef = useRef<FormValues | null>(null);
 
-  const [parentTab, setParentTab] = useState<'intelligent-routing'>('intelligent-routing');
-  // Content tab: 'stats' or 'analytics', always reset to 'stats' when parentTab changes
+  const parentTab = 'intelligent-routing';
+  // Content tab: 'stats' or 'analytics'
   const [contentTab, setContentTab] = useState<'stats' | 'analytics'>('stats');
 
   useEffect(() => {
@@ -173,10 +173,6 @@ export default function HomePage() {
       // For now, we don't auto-fetch here to ensure modal interaction.
     }
   }, []); // Run once on mount
-
-  useEffect(() => {
-    setContentTab('stats');
-  }, [parentTab]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -1292,7 +1288,7 @@ export default function HomePage() {
         <div className={parentTab === 'intelligent-routing' ? 'theme-intelligent' : ''}>
           <Header
             activeTab={parentTab}
-            onTabChange={tab => setParentTab(tab as 'intelligent-routing')}
+            onTabChange={() => {}}
             onStartSimulation={handleStartSimulation} onPauseSimulation={handlePauseSimulation}
             onStopSimulation={handleStopSimulation} simulationState={simulationState}
           />
