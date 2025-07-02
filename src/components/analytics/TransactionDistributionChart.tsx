@@ -2,14 +2,14 @@
 
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PieChart as PieChartIcon } from 'lucide-react'; // Renamed to avoid conflict
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts"; // Removed Text
-import React, { useEffect, useRef, useMemo, useCallback } from 'react'; // Added useCallback
-import type { MerchantConnector } from '@/lib/types'; // Import MerchantConnector
+import { PieChart as PieChartIcon } from 'lucide-react'; 
+import { PieChart, Pie, Cell, Legend, ResponsiveContainer } from "recharts"; 
+import React, { useEffect, useRef, useMemo, useCallback } from 'react'; 
+import type { MerchantConnector } from '@/lib/types'; 
 
 interface TransactionDistributionChartProps {
-  data: Array<{ name: string; value: number; fill?: string }>; // Made fill optional
-  merchantConnectors: MerchantConnector[]; // Added merchantConnectors prop
+  data: Array<{ name: string; value: number; fill?: string }>; 
+  merchantConnectors: MerchantConnector[]; 
 }
 
 // Predefined direct HSL color strings for the pie chart
@@ -42,7 +42,6 @@ export function TransactionDistributionChart({ data, merchantConnectors }: Trans
     uniqueNames.forEach((name, i) => {
       map.set(name, PIE_CHART_COLORS[i % PIE_CHART_COLORS.length]);
     });
-    console.log('Generated nameColorMap:', map); // Debugging output
     return map;
   }, [uniqueNames]);
 
@@ -102,7 +101,7 @@ export function TransactionDistributionChart({ data, merchantConnectors }: Trans
                 cy="50%"
                 outerRadius={80}
                 labelLine={false}
-                label={renderCustomizedLabel} // Add the label prop here
+                label={renderCustomizedLabel} 
                 fontSize={12}
                 stroke="hsl(var(--background))" // Use direct background for stroke between cells
                 strokeWidth={2}

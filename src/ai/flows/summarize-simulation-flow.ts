@@ -7,8 +7,6 @@
 // No direct import of 'generate' is needed; we will call the defined prompt.
 import { googleAI } from '@genkit-ai/googleai'; // For type reference if needed
 import { ai } from '@/ai/genkit'; // The configured Genkit instance
-// Removed unused 'z' import
-// Removed 'defineFlow, generate' import as they are not used directly or come from 'ai'
 import {
   SummarizeSimulationInputSchema,
   type AISummaryInput,
@@ -83,7 +81,6 @@ const summarizeSimulationFlow = ai.defineFlow(
     name: 'summarizeSimulationFlow',
     inputSchema: SummarizeSimulationInputSchema,
     outputSchema: SummarizeSimulationOutputSchema,
-    // Removed 'plugins' array from here, as it causes global API key issues
   },
   async (input: AISummaryInput) => {
     try {

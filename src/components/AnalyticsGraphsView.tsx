@@ -3,7 +3,7 @@
 import type React from 'react';
 import { SuccessRateOverTimeChart } from './analytics/SuccessRateOverTimeChart';
 import { VolumeOverTimeChart } from './analytics/VolumeOverTimeChart';
-import type { ProcessorMetricsHistory, MerchantConnector } from '@/lib/types'; // Added MerchantConnector
+import type { ProcessorMetricsHistory, MerchantConnector } from '@/lib/types'; 
 
 interface AnalyticsGraphsViewProps {
   successRateHistory: ProcessorMetricsHistory;

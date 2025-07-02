@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useMemo } from 'react'; // Added useMemo
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'; // Removed Text, not used
+import React, { useMemo } from 'react'; 
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BarChartBig } from 'lucide-react';
-import type { ProcessorMetricsHistory, MerchantConnector, TimeSeriesDataPoint } from '@/lib/types'; // Added MerchantConnector
+import type { ProcessorMetricsHistory, MerchantConnector, TimeSeriesDataPoint } from '@/lib/types'; 
 
 interface VolumeOverTimeChartProps {
   data: ProcessorMetricsHistory;

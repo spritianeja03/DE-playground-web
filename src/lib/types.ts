@@ -36,8 +36,7 @@ export interface StructuredRule {
 // For ControlsState and FormValues in BottomControlsPanel
 export interface ControlsState {
   totalPayments: number;
-  // tps: number; // TPS Removed
-  selectedPaymentMethods: PaymentMethod[]; // Re-added to reflect "Card" as selected
+  selectedPaymentMethods: PaymentMethod[]; 
   processorMatrix: ProcessorPaymentMethodMatrix;
   structuredRule: StructuredRule | null;
   processorIncidents: ProcessorIncidentStatus;
@@ -49,12 +48,7 @@ export interface ControlsState {
     successfulPaymentCount: number; // Actual count
     totalPaymentCount: number;      // Actual count
   }>;
-  // New Intelligent Routing Parameters
-  minAggregatesSize: number;
-  maxAggregatesSize: number;
-  currentBlockThresholdMaxTotalCount: number;
-  volumeSplit: number;
-  isSuccessBasedRoutingEnabled?: boolean; // Renamed for consistency
+  isSuccessBasedRoutingEnabled?: boolean; 
   // Batch processing parameters
   numberOfBatches?: number;
   batchSize?: number;
@@ -132,11 +126,9 @@ export type AISummaryOutput = z.infer<typeof SummarizeSimulationOutputSchema>;
 export interface MerchantConnector {
   connector_name: string; // Typically used as an identifier if no specific ID field is primary
   connector_label: string; // User-friendly display name
-  merchant_connector_id: string; // Often the most stable unique identifier for the merchant's specific connector instance
+  merchant_connector_id: string; 
   disabled?: boolean; // Explicitly add the disabled field
   connector_type?: string; // Using string for flexibility, can be a union of known types
-  // status?: 'active' | 'inactive'; // 'disabled' field might replace or complement a 'status' field
-  // payment_methods_enabled?: Array<Record<string, any>>; // If API provides this detail
   [key: string]: any; // Allow other dynamic properties
 }
 
@@ -145,7 +137,7 @@ export interface TransactionLogEntry {
   transactionNumber: number;
   status: string; // e.g., "succeeded", "failed", "pending"
   connector: string; // The connector used for the transaction
-  timestamp: number; // epoch milliseconds, to help with sequencing and time-based analysis
-  routingApproach?: 'exploration' | 'exploitation' | 'unknown' | 'N/A'; // Added routing approach
-  sr_scores?: Record<string, number>; // Added sr_scores
+  timestamp: number; 
+  routingApproach?: 'exploration' | 'exploitation' | 'default' | 'unknown' | 'N/A'; 
+  sr_scores?: Record<string, number>; 
 }

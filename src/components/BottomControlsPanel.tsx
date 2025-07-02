@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"; // Added Accordion
 import { PAYMENT_METHODS } from '@/lib/constants'; 
 import type { ControlsState, PaymentMethod, ProcessorPaymentMethodMatrix, ProcessorIncidentStatus, StructuredRule, ConditionField, ConditionOperator, MerchantConnector } from '@/lib/types';
-import { Settings2, TrendingUp, Zap, VenetianMaskIcon, AlertTriangle, Trash2, Copy } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const LOCALSTORAGE_SUCCESS_CARD_KEY = 'hyperswitch_successCardDetails';
@@ -82,15 +82,10 @@ const formSchema = z.object({
     successfulPaymentCount: z.number().min(0), // Actual count
     totalPaymentCount: z.number().min(0),      // Actual count
   })),
-  currentBlockThresholdDurationInMins: z.number().min(0).optional(), // Retain for now, but will be replaced by minAggregatesSize for API
-  currentBlockThresholdMaxTotalCount: z.number().min(0).max(10000).optional(), // Retain for now, but will be replaced by maxAggregatesSize for API
-  minAggregatesSize: z.number().min(0).optional(), // New field for min_aggregates_size
-  maxAggregatesSize: z.number().min(0).optional(), // New field for max_aggregates_size
   bucketSize: z.number().min(0).optional(), // New field for bucketSize
   isSuccessBasedRoutingEnabled: z.boolean().optional(),
-  // Global Test Payment Data Fields are removed from schema
   connectorWiseFailurePercentage: z.record(z.string(), z.number()), // Connector-wise failure percentage
-  explorationPercent: z.number().min(0).max(100).optional(), // Added explorationPercent
+  explorationPercent: z.number().min(0).max(100).optional(), 
   connectorWiseTestCards: z.record(z.string(), z.object({
     successCard: z.object({
       cardNumber: z.string().optional(),
@@ -123,9 +118,9 @@ const formSchema = z.object({
 export type FormValues = Omit<z.infer<typeof formSchema>, 'structuredRule' | 'overallSuccessRate'> & {
   structuredRule: StructuredRule | null;
   overallSuccessRate?: number;
-  isSuccessBasedRoutingEnabled?: boolean; // Corrected to match form schema
+  isSuccessBasedRoutingEnabled?: boolean; 
   explorationPercent?: number; // Ensure it's part of FormValues if not automatically inferred
-  bucketSize?: number; // Added bucketSize
+  bucketSize?: number; 
   connectorWiseTestCards?: Record<string, {
     successCard?: {
       cardNumber?: string;
@@ -160,7 +155,7 @@ interface BottomControlsPanelProps {
   collapsed?: boolean;
   onToggleCollapse: () => void;
   activeTab: string;
-  parentTab?: 'intelligent-routing' | 'least-cost-routing';
+  parentTab: 'intelligent-routing';
 }
 
 function formatCardNumber(value: string) {
@@ -176,18 +171,11 @@ export function BottomControlsPanel({
   merchantConnectors,
   connectorToggleStates, 
   onConnectorToggleChange, 
-  apiKey, 
-  profileId, 
-  merchantId, 
   collapsed = false,
-  onToggleCollapse,
   activeTab,
   parentTab = 'intelligent-routing',
-}: BottomControlsPanelProps & { activeTab: string; parentTab?: 'intelligent-routing' | 'least-cost-routing' }) {
+}: BottomControlsPanelProps & { activeTab: string; parentTab: 'intelligent-routing' }) {
   const { toast } = useToast();
-  const [successBasedAlgorithmId, setSuccessBasedAlgorithmId] = useState<string | null>(null);
-  // const [activeRoutingAlgorithm, setActiveRoutingAlgorithm] = useState<any | null>(null); // Removed
-  // const [isLoadingActiveRouting, setIsLoadingActiveRouting] = useState<boolean>(false); // Removed
   const dynamicDefaults = useMemo(() => {
     const matrix: ProcessorPaymentMethodMatrix = {};
     const incidents: ProcessorIncidentStatus = {};
@@ -238,16 +226,11 @@ export function BottomControlsPanel({
       processorMatrix: dynamicDefaults.matrix,
       processorIncidents: dynamicDefaults.incidents,
       processorWiseSuccessRates: dynamicDefaults.rates,
-      currentBlockThresholdDurationInMins: 60, // Default for old field
-      currentBlockThresholdMaxTotalCount: 20, // Default for old field
-      minAggregatesSize: 5, // Default for new field
-      maxAggregatesSize: 10, // Default for new field
       isSuccessBasedRoutingEnabled: true, // Default to true
       ruleConditionField: undefined,
       ruleConditionOperator: undefined,
       ruleConditionValue: undefined,
       ruleActionProcessorId: undefined,
-      // Global Test Payment Data Defaults are removed
       connectorWiseFailurePercentage: dynamicDefaults.connectorWiseFailurePercentage,
       connectorWiseTestCards: dynamicDefaults.connectorWiseTestCardsInit, // Initialize here
       explorationPercent: 20, // Default value for explorationPercent
@@ -263,47 +246,25 @@ export function BottomControlsPanel({
       numberOfBatches: 100, // Default value for numberOfBatches
       batchSize: 10, // Default value for batchSize
       ...initialValues, // Props override static defaults
-      // Removed ...loadInitialCardDetails() as global fields are not in form schema
     },
   });
-  
-  // const isSuccessBasedRoutingEnabledWatched = form.watch("isSuccessBasedRoutingEnabled"); // No longer needed for effect
-  // const previousIsSuccessBasedRoutingEnabledRef = useRef<boolean | undefined>(); // No longer needed
-
-  // useEffect(() => { // This effect is removed
-  //   previousIsSuccessBasedRoutingEnabledRef.current = form.getValues("isSuccessBasedRoutingEnabled");
-  // }, [form]);
-
-  // Removed useEffect for fetchActiveRouting
 
   const handleSuccessBasedRoutingToggle = (enable: boolean) => {
     // Directly update form state and show toast, no API calls.
     form.setValue('isSuccessBasedRoutingEnabled', enable, { shouldDirty: true, shouldValidate: true });
 
     if (enable) {
-      // The API calls for toggle and volume split are removed.
-      // We can still set successBasedAlgorithmId to a placeholder or null if it's used elsewhere,
-      // or remove its state management if it's no longer needed.
-      // For now, let's assume it's not critical if the API isn't called.
-      setSuccessBasedAlgorithmId(null); // Or some other indicator if needed
       toast({
         title: "Success Based Routing Enabled",
         description: "Configure parameters for success-based routing.",
       });
-      // The volume split concept might be implicitly 100% to this strategy now,
-      // or it's handled by the backend when this strategy is chosen by the payment request.
-      // toast({ title: "Volume Split Info", description: "Volume split is now 100% to dynamic routing when active." });
     } else {
-      setSuccessBasedAlgorithmId(null);
       toast({
         title: "Success Based Routing Disabled",
         description: "Routing will fallback to other configurations or defaults.",
       });
     }
   };
-
-  const [selectedIncidentProcessor, setSelectedIncidentProcessor] = useState<string>('');
-  const [incidentDuration, setIncidentDuration] = useState<number>(10);
 
   useEffect(() => {
     if (merchantConnectors && merchantConnectors.length > 0) {
@@ -323,9 +284,6 @@ export function BottomControlsPanel({
         });
 
         const firstConnectorId = merchantConnectors[0].merchant_connector_id || merchantConnectors[0].connector_name;
-        if (firstConnectorId && (!selectedIncidentProcessor || !merchantConnectors.some(c => (c.merchant_connector_id || c.connector_name) === selectedIncidentProcessor))) {
-            setSelectedIncidentProcessor(firstConnectorId);
-        }
     } else {
         const currentFormValues = form.getValues();
         form.reset({
@@ -338,9 +296,8 @@ export function BottomControlsPanel({
             connectorWiseTestCards: {}, // Add to reset
             ruleActionProcessorId: undefined,
         });
-        setSelectedIncidentProcessor('');
     }
-}, [merchantConnectors, dynamicDefaults, form, initialValues, selectedIncidentProcessor]);
+}, [merchantConnectors, dynamicDefaults, form, initialValues]);
 
 
   useEffect(() => {
@@ -358,9 +315,6 @@ export function BottomControlsPanel({
         }
         const { overallSuccessRate, ...outputValues } = formData as any; 
         onFormChange({ ...outputValues, structuredRule: rule } as FormValues);
-
-        // Save card details to localStorage
-        // Saving global card details to localStorage is removed as fields are removed
       }
     });
 
@@ -388,20 +342,6 @@ export function BottomControlsPanel({
 
   const { control, setValue } = form;
 
-  const handleTriggerIncident = () => {
-    if (selectedIncidentProcessor && incidentDuration > 0) {
-      const endTime = Date.now() + incidentDuration * 1000;
-      setValue(`processorIncidents.${selectedIncidentProcessor}`, endTime, { shouldValidate: true, shouldDirty: true });
-    }
-  };
-
-  const handleClearRule = () => {
-    setValue('ruleConditionField', undefined);
-    setValue('ruleConditionOperator', undefined);
-    setValue('ruleConditionValue', undefined);
-    setValue('ruleActionProcessorId', undefined);
-  };
-
   return (
     <div className="flex flex-col h-full">
       <div
@@ -413,83 +353,66 @@ export function BottomControlsPanel({
               {activeTab === 'general' && (
                 <ScrollArea className="h-[100%]">
                   <div className="flex flex-col gap-4">
-                    {/* Show only Total Payments for least-cost-routing, show all for intelligent-routing */}
-                    {parentTab === 'least-cost-routing' ? (
+                    <>
                       <FormField
                         control={control}
                         name="totalPayments"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Total Payments</FormLabel>
-                            <FormControl>
-                              <Input type="number" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          const numberOfBatches = form.watch('numberOfBatches') || 100;
+                          const batchSize = form.watch('batchSize') || 10;
+                          const calculatedTotal = numberOfBatches * batchSize;
+                          // Update the totalPayments value when numberOfBatches or batchSize changes
+                          React.useEffect(() => {
+                            field.onChange(calculatedTotal);
+                          }, [numberOfBatches, batchSize, calculatedTotal, field]);
+                          return (
+                            <FormItem>
+                              <FormLabel>Total Payments (Calculated)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  value={calculatedTotal} 
+                                  disabled 
+                                  className="bg-muted" 
+                                />
+                              </FormControl>
+                              <FormDescription className="text-xs">
+                                {numberOfBatches} batches × {batchSize} payments/batch = {calculatedTotal} total
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
-                    ) : (
-                      <>
+                      <div className="flex flex-col gap-4">
                         <FormField
                           control={control}
-                          name="totalPayments"
-                          render={({ field }) => {
-                            const numberOfBatches = form.watch('numberOfBatches') || 100;
-                            const batchSize = form.watch('batchSize') || 10;
-                            const calculatedTotal = numberOfBatches * batchSize;
-                            // Update the totalPayments value when numberOfBatches or batchSize changes
-                            React.useEffect(() => {
-                              field.onChange(calculatedTotal);
-                            }, [numberOfBatches, batchSize, calculatedTotal, field]);
-                            return (
-                              <FormItem>
-                                <FormLabel>Total Payments (Calculated)</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    value={calculatedTotal} 
-                                    disabled 
-                                    className="bg-muted" 
-                                  />
-                                </FormControl>
-                                <FormDescription className="text-xs">
-                                  {numberOfBatches} batches × {batchSize} payments/batch = {calculatedTotal} total
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            );
-                          }}
+                          name="numberOfBatches"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Number of Batches</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="e.g., 100" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                        <div className="flex flex-col gap-4">
-                          <FormField
-                            control={control}
-                            name="numberOfBatches"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Number of Batches</FormLabel>
-                                <FormControl>
-                                  <Input type="number" placeholder="e.g., 100" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={control}
-                            name="batchSize"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Batch Size</FormLabel>
-                                <FormControl>
-                                  <Input type="number" placeholder="e.g., 10" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </>
-                    )}
+                        <FormField
+                          control={control}
+                          name="batchSize"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Batch Size</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="e.g., 10" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </>
                     {parentTab === 'intelligent-routing' && (
                       <div className="md:col-span-2">
                         <FormLabel>Payment Methods</FormLabel>
@@ -620,16 +543,13 @@ export function BottomControlsPanel({
                       </div>
                       <div className="text-xs text-muted-foreground mt-2">This is an example of the payload sent to the /payments API. Actual values for profile_id and card details are substituted during simulation. The 'routing' object is added if Success Based Routing is enabled and a connector is selected by the SR API.</div>
                     </div>
-                    {/* Payment Methods section removed */}
-                    {/* Success Test Card Section (moved to test-payment-data) */}
-                    {/* Failure Test Card Section (moved to test-payment-data) */}
                   </div>
                 </ScrollArea>
               )}
               {activeTab === 'processors' && (
-                <div className="bg-white dark:bg-card rounded-xl p-2 flex flex-col flex-grow"> {/* Added flex flex-col flex-grow */}
+                <div className="bg-white dark:bg-card rounded-xl p-2 flex flex-col flex-grow"> 
                   <CardHeader><CardTitle className="text-base">Processor ↔ PM Matrix</CardTitle></CardHeader>
-                  <CardContent className="flex flex-col gap-4 flex-grow overflow-y-auto"> {/* Added flex-grow overflow-y-auto */}
+                  <CardContent className="flex flex-col gap-4 flex-grow overflow-y-auto"> 
                     <div className="flex flex-col gap-2">
                       {(merchantConnectors || []).map(connector => {
                         const connectorId = connector.merchant_connector_id || connector.connector_name;
@@ -660,7 +580,6 @@ export function BottomControlsPanel({
                   <div>
                     <div className="pb-3">
                       <div className="flex items-center">
-                        <Settings2 className="mr-2 h-5 w-5 text-primary" />
                         <span className="text-lg font-semibold">Routing Parameters</span>
                       </div>
                       <div className="text-xs text-muted-foreground pt-2">Select and configure intelligent routing strategies. Fields are shown if a strategy is enabled.</div>
@@ -694,7 +613,7 @@ export function BottomControlsPanel({
                               <FormLabel className="text-xs">Exploration Percent: {field.value}%</FormLabel>
                               <FormControl>
                                 <Slider
-                                  value={[field.value || 20]} // Changed from defaultValue to value
+                                  value={[field.value || 20]} 
                                   min={0} max={100} step={1}
                                   onValueChange={(value: number[]) => { field.onChange(value[0]); }}
                                 />
@@ -704,64 +623,8 @@ export function BottomControlsPanel({
                             </FormItem>
                           )}
                         />
-                        {/* <FormField
-                          control={control}
-                          name="bucketSize"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Bucket Size</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="e.g., 200" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} min="0" className="bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border text-gray-900 dark:text-white rounded-md px-3 py-2" />
-                              </FormControl>
-                              <FormDescription className="text-xs">Size of the buckets for success rate calculation.</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        /> */}
                         <div className="bg-white dark:bg-card rounded-xl p-2">
                           <h4 className="text-sm font-medium mb-2">Success Rate Window Parameters</h4>
-                          {/* <FormField
-                            control={control}
-                            name="minAggregatesSize"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Minimum Bucket Count (min_aggregates_size)</FormLabel>
-                                <FormControl>
-                                  <Input type="number" placeholder="e.g., 5" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} min="0" className="bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border text-gray-900 dark:text-white rounded-md px-3 py-2" />
-                                </FormControl>
-                                <FormDescription className="text-xs">Min. aggregate data points for SR calculation (for /fetch).</FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          /> */}
-                          {/* <FormField
-                            control={control}
-                            name="maxAggregatesSize"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Payment Count for Each Bucket (max_aggregates_size)</FormLabel>
-                                <FormControl>
-                                  <Input type="number" placeholder="e.g., 10" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} min="0" className="bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border text-gray-900 dark:text-white rounded-md px-3 py-2" />
-                                </FormControl>
-                                <FormDescription className="text-xs">Max. aggregate data points in a window (for /update).</FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          /> */}
-                          {/* <FormField
-                                control={control}
-                                name="currentBlockThresholdMaxTotalCount"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-xs">Current Block Threshold (max_total_count)</FormLabel>
-                                    <FormControl>
-                                      <Input type="number" placeholder="e.g., 5" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} min="0"/>
-                                    </FormControl>
-                                    <FormDescription className="text-xs">Max total count for current block threshold.</FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              /> */}
                               <FormField
                             control={control}
                             name="bucketSize"
@@ -812,7 +675,7 @@ export function BottomControlsPanel({
               </div>
             )}
             {activeTab === 'test-payment-data' && (
-              <div className="flex flex-col gap-6"> {/* Adjusted gap */}
+              <div className="flex flex-col gap-6"> 
                 {/* Separate Section for Failure Percentages */}
                 <Card>
                   <CardHeader>
@@ -824,7 +687,6 @@ export function BottomControlsPanel({
                   <CardContent className="space-y-4 pt-4">
                     {(merchantConnectors || []).filter(connector => connector.disabled == false).map((connector) => {
                       const connectorId = connector.connector_name; // Use connector_name as the key
-                      // const connectorDisplayName = connector.connector_label || connector.connector_name; // Use connector_name directly
                       // Watch the specific field for its current value to display in the label
                       const watchedFailureRate = form.watch(`connectorWiseFailurePercentage.${connectorId}`) ?? 0;
 
@@ -870,7 +732,6 @@ export function BottomControlsPanel({
                     <Accordion type="multiple" className="w-full">
                       {(merchantConnectors || []).map((connector) => {
                         const connectorId = connector.connector_name; // Use connector_name as the key
-                        // const connectorDisplayName = connector.connector_label || connector.connector_name; // Use connector_name directly
 
                         return (
                           <AccordionItem value={connectorId} key={connectorId}>
@@ -1016,7 +877,6 @@ export function BottomControlsPanel({
                     </Accordion>
                   </CardContent>
                 </Card>
-                {/* Global Test Card Sections Removed */}
               </div>
             )}
           </form>

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo } from 'react'; // Added useMemo
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Text } from 'recharts';
+import React, { useMemo } from 'react'; 
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LineChart } from 'lucide-react';
 import type { ProcessorMetricsHistory, MerchantConnector } from '@/lib/types';
@@ -110,7 +110,7 @@ export function SuccessRateOverTimeChart({ data, merchantConnectors, connectorTo
               stroke="hsl(var(--muted-foreground))"
               domain={[0, 100]}
               tickFormatter={(value) => String(Math.round(value))} // Display numbers for percentage
-              width={45} // Slightly increased width for potential 3-digit numbers if label is very close
+              width={45} 
               label={{ value: 'Success Rate', angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))', fontSize: 12, dy: 40, dx: -10 }}
             />
             <Tooltip 
