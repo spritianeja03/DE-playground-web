@@ -18,7 +18,7 @@ import type { PaymentMethod, ProcessorMetricsHistory, StructuredRule, ControlsSt
 import { PAYMENT_METHODS} from '@/lib/constants'; 
 import { useToast } from '@/hooks/use-toast';
 import { summarizeSimulation } from '@/ai/flows/summarize-simulation-flow';
-import SplitPane from 'react-split-pane-next';
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { MiniSidebar } from '@/components/MiniSidebar';
 
 const LOCALSTORAGE_API_KEY = 'hyperswitch_apiKey';
@@ -1325,19 +1325,11 @@ export default function HomePage() {
               </div>
             )}
             {/* Main and Logs with draggable splitter */}
-            {/* @ts-ignore */}
-            <SplitPane
-              split="vertical"
-              minSize={340}
-              defaultSize={340}
-              primary="second"
-              maxSize={typeof window !== 'undefined' ? window.innerWidth - 400 : undefined}
-              onChange={size => setMainPaneSize(typeof size === 'number' ? `${size}px` : size)}
-              style={{ position: 'relative', height: '100%', flex: 1 }}
-            >
-              <div className="flex flex-col overflow-hidden h-full">
-                <Tabs value={contentTab} onValueChange={tab => setContentTab(tab as 'stats' | 'analytics')} className="flex flex-col h-full">
-                  <div className="flex items-center justify-start p-4 pb-0">
+            <PanelGroup direction="horizontal" className="flex-grow">
+              <Panel>
+                <div className="flex flex-col overflow-hidden h-full">
+                  <Tabs value={contentTab} onValueChange={tab => setContentTab(tab as 'stats' | 'analytics')} className="flex flex-col h-full">
+                    <div className="flex items-center justify-start p-4 pb-0">
                     <TabsList>
                       <TabsTrigger value="stats">Stats</TabsTrigger>
                       <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -1371,10 +1363,13 @@ export default function HomePage() {
                     </ScrollArea>
                   </TabsContent>
                 </Tabs>
-              </div>
-              <div className="flex flex-col h-full min-h-0 border-l p-2 md:p-4 lg:p-6">
-                <h2 className="text-lg font-semibold mb-2 flex-shrink-0">Transaction Logs</h2>
-                <div className="flex-grow min-h-0">
+                </div>
+              </Panel>
+              <PanelResizeHandle className="w-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors" />
+              <Panel defaultSize={40} minSize={30}>
+                <div className="flex flex-col h-full min-h-0 border-l p-2 md:p-4 lg:p-6">
+                  <h2 className="text-lg font-semibold mb-2 flex-shrink-0">Transaction Logs</h2>
+                  <div className="flex-grow min-h-0">
                   <ScrollArea className="h-full">
                     {transactionLogs.length > 0 ? (
                       transactionLogs.slice().reverse().map((log, index) => (
@@ -1415,9 +1410,10 @@ export default function HomePage() {
                       <p className="text-sm text-muted-foreground">Log entries will appear here...</p>
                     )}
                   </ScrollArea>
+                  </div>
                 </div>
-              </div>
-            </SplitPane>
+              </Panel>
+            </PanelGroup>
           </div>
         </div>
       </AppLayout>
