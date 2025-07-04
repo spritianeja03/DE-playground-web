@@ -102,7 +102,7 @@ export default function HomePage() {
     };
 
     try {
-      const response = await fetch('/api/hs-proxy/rule/update', {
+      const response = await fetch('/demo/app/api/hs-proxy/rule/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -243,7 +243,7 @@ export default function HomePage() {
     };
 
     try {
-      const response = await fetch('/api/hs-proxy/decide-gateway', {
+      const response = await fetch('/demo/app/api/hs-proxy/decide-gateway', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -336,7 +336,7 @@ export default function HomePage() {
     console.log("[UpdateSuccessRateWindow] Payload:", JSON.stringify(payload, null, 2));
 
     try {
-      const response = await fetch('/api/hs-proxy/update-gateway-score', {
+      const response = await fetch('/demo/app/api/hs-proxy/update-gateway-score', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -391,7 +391,7 @@ export default function HomePage() {
     setIsLoadingMerchantConnectors(true); 
 
     try {
-      const response = await fetch('/api/hs-proxy/merchant-account/create', {
+      const response = await fetch('/demo/app/api/hs-proxy/merchant-account/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -471,7 +471,7 @@ export default function HomePage() {
       }
     }
     try {
-      const response = await fetch('/api/hs-proxy/rule/create', {
+      const response = await fetch('/demo/app/api/hs-proxy/rule/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -796,7 +796,7 @@ export default function HomePage() {
     let logEntry: TransactionLogEntry | null = null;
 
     try {
-      const response = await fetch('/api/hs-proxy/payments', {
+      const response = await fetch('/demo/app/api/hs-proxy/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1117,8 +1117,11 @@ export default function HomePage() {
 
   useEffect(() => {
     console.log("useEffect: Mounting, checking API credentials.");
-    if (simulationState == 'running') {
-      processTransactionBatch();
+    if (simulationState === 'running') {
+      const timer = setTimeout(() => {
+        processTransactionBatch();
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [simulationState, processTransactionBatch]);
 
@@ -1270,7 +1273,10 @@ export default function HomePage() {
       transactionLogs.length > 0 &&
       !summaryAttempted // Only attempt if not already attempted for this run
     ) {
-      handleRequestAiSummary();
+      const timer = setTimeout(() => {
+        handleRequestAiSummary();
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [
     simulationState,
