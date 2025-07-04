@@ -1,8 +1,12 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  /* config options here */
+
+  // ✅ Add this for hosting under /demo/app
+  basePath: '/demo/app',
+  assetPrefix: '/demo/app',
+
   typescript: {
     ignoreBuildErrors: true,
   },
