@@ -15,9 +15,9 @@ import {
 } from '@/lib/types';
 
 
-export async function summarizeSimulation(input: AISummaryInput): Promise<AISummaryOutput> {
-  return summarizeSimulationFlow(input);
-}
+// export async function summarizeSimulation(input: AISummaryInput): Promise<AISummaryOutput> {
+//   return summarizeSimulationFlow(input);
+// }
 
 // Define the prompt using ai.definePrompt
 const summarizeSimulationUserApiKeyPrompt = ai.definePrompt({
@@ -76,29 +76,29 @@ Be specific with transaction numbers where possible when describing transition p
 `,
 });
 
-const summarizeSimulationFlow = ai.defineFlow(
-  {
-    name: 'summarizeSimulationFlow',
-    inputSchema: SummarizeSimulationInputSchema,
-    outputSchema: SummarizeSimulationOutputSchema,
-  },
-  async (input: AISummaryInput) => {
-    try {
-      // Call the defined prompt.
-      // The model is set in definePrompt.
-      // The googleAI plugin will automatically use the GOOGLE_API_KEY environment variable.
-      console.log('Calling AI model for simulation summary.');
-      const result = await summarizeSimulationUserApiKeyPrompt(input);
+// const summarizeSimulationFlow = ai.defineFlow(
+//   {
+//     name: 'summarizeSimulationFlow',
+//     inputSchema: SummarizeSimulationInputSchema,
+//     outputSchema: SummarizeSimulationOutputSchema,
+//   },
+//   async (input: AISummaryInput) => {
+//     try {
+//       // Call the defined prompt.
+//       // The model is set in definePrompt.
+//       // The googleAI plugin will automatically use the GOOGLE_API_KEY environment variable.
+//       console.log('Calling AI model for simulation summary.');
+//       const result = await summarizeSimulationUserApiKeyPrompt(input);
 
-      const output = result.output;
-      if (!output) {
-        console.error('AI prompt call returned no output for summarizeSimulationFlow.');
-        throw new Error('AI failed to generate a summary (no output).');
-      }
-      return output;
-    } catch (error) {
-      console.error('Error calling AI model in summarizeSimulationFlow:', error);
-      throw new Error(`AI summary generation encountered an error: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-);
+//       const output = result.output;
+//       if (!output) {
+//         console.error('AI prompt call returned no output for summarizeSimulationFlow.');
+//         throw new Error('AI failed to generate a summary (no output).');
+//       }
+//       return output;
+//     } catch (error) {
+//       console.error('Error calling AI model in summarizeSimulationFlow:', error);
+//       throw new Error(`AI summary generation encountered an error: ${error instanceof Error ? error.message : String(error)}`);
+//     }
+//   }
+// );
