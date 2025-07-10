@@ -87,8 +87,8 @@ export default function HomePage() {
         type: "successRate",
         data: {
           defaultLatencyThreshold: 90,
-          defaultSuccessRate: 0.5,
-          defaultBucketSize: bucketSize,
+          defaultSuccessRate: 100,
+          defaultBucketSize: 200,
           defaultHedgingPercent: 5,
           subLevelInputConfig: [
             {
@@ -204,17 +204,17 @@ export default function HomePage() {
   const decideGateway = useCallback(async (
     currentControls: FormValues,
     activeConnectorLabels: string[], 
-    currentMerchantId: string,
+    currentProfileId: string,
     paymentId: string 
   ): Promise<{ selectedConnector: string | null; routingApproach: TransactionLogEntry['routingApproach']; srScores: Record<string, number> | undefined }> => {
-    if (!currentControls || activeConnectorLabels.length === 0 || !currentMerchantId) { 
+    if (!currentControls || activeConnectorLabels.length === 0 || !currentProfileId) { 
       console.warn("[decideGateway] Missing required parameters (controls, labels, or merchantId).");
       return { selectedConnector: null, routingApproach: 'unknown', srScores: undefined };
     }
 
 
     const payload = {
-      merchantId: currentMerchantId,
+      merchantId: currentProfileId,
       eligibleGatewayList: activeConnectorLabels,
       rankingAlgorithm: "SR_BASED_ROUTING",
       eliminationEnabled: false,
@@ -308,13 +308,13 @@ export default function HomePage() {
 
 
   const updateGatewayScore = useCallback(async (
-    currentMerchantId: string,
+    currentProfileId: string,
     connectorNameForApi: string, // This should be the connector_name
     paymentSuccessStatus: boolean,
     controls: FormValues | null, // Pass currentControls to access config values
     paymentId: string
   ) => {
-    if (!currentMerchantId || !connectorNameForApi) {
+    if (!currentProfileId || !connectorNameForApi) {
       console.warn("[UpdateSuccessRateWindow] Missing profileId or connectorName.");
       return;
     }
@@ -325,7 +325,7 @@ export default function HomePage() {
 
     const apiStatus = paymentSuccessStatus ? "CHARGED" : "FAILURE";
     const payload = {
-      merchantId: currentMerchantId,
+      merchantId: currentProfileId,
       gateway: connectorNameForApi,
       gatewayReferenceId: null,
       status: apiStatus,
@@ -382,10 +382,10 @@ export default function HomePage() {
     });
   }, []);
 
-  const createMerchantIdForDecisionEngine = async (currentMerchantId: string): Promise<string | void> => {
-    if (!currentMerchantId) {
-      console.warn("[createMerchantIdForDecisionEngine] Missing currentMerchantId. Cannot create decision engine merchant ID.");
-      return; 
+  const createMerchantIdForDecisionEngine = async (currentProfileId: string): Promise<string | void> => {
+    if (!currentProfileId) {
+      console.warn("[createMerchantIdForDecisionEngine] Missing currentProfileId. Cannot create decision engine merchant ID.");
+      return;
     }
 
     setIsLoadingMerchantConnectors(true); 
@@ -398,7 +398,7 @@ export default function HomePage() {
           'x-feature': 'decision-engine'
         },
         body: JSON.stringify({
-          merchant_id: currentMerchantId,
+          merchant_id: currentProfileId,
         }),
       });
 
@@ -426,7 +426,7 @@ export default function HomePage() {
             console.log("[createMerchantIdForDecisionEngine] Info: HTTP call successful. Response body did not contain 'ok' field or it was not boolean. Body:", data);
             toast({ title: "Decision Engine Setup", description: "Merchant account for decision engine initiated.", variant: "default" });
         }
-        return currentMerchantId; // Return the merchant ID as string
+        return profileId;
       } else {
         // HTTP error (e.g., 4xx, 5xx)
         const errorMessage = data?.message || data?.error?.message || `API Error HTTP ${response.status}`;
@@ -456,7 +456,7 @@ export default function HomePage() {
         type: "successRate",
         data: {
           defaultLatencyThreshold: 90,
-          defaultSuccessRate: 0.5,
+          defaultSuccessRate: 100,
           defaultBucketSize: 200,
           defaultHedgingPercent: 5,
           subLevelInputConfig: [
@@ -611,16 +611,16 @@ export default function HomePage() {
       toast({ title: "API Credentials Required", description: "Please enter all API credentials.", variant: "destructive" });
       return;
     }
-    const localStoragemerchnatId = localStorage.getItem(LOCALSTORAGE_MERCHANT_ID);
+    const localStorageProfileId = localStorage.getItem(LOCALSTORAGE_PROFILE_ID);
     
-    if(localStoragemerchnatId === merchantId){
+    if(localStorageProfileId === profileId){
       setIsApiCredentialsModalOpen(false);
       fetchMerchantConnectors(merchantId, apiKey);
     }
     else{
       setIsApiCredentialsModalOpen(false);
       fetchMerchantConnectors(merchantId, apiKey);
-      const decisionEngineMerchantId = await createMerchantIdForDecisionEngine(merchantId);
+      const decisionEngineMerchantId = await createMerchantIdForDecisionEngine(profileId);
       console.log(">>>Merchant ID for Decision Engine:", decisionEngineMerchantId);
       if (decisionEngineMerchantId) {
         createSrRuleForDecisonEngine(decisionEngineMerchantId);
@@ -697,7 +697,7 @@ export default function HomePage() {
         const decisionResult = await decideGateway(
           currentControls,
           activeConnectorLabels,
-          merchantId,
+          profileId,
           paymentId // Pass the generated paymentId
         );
         returnedConnectorLabel = decisionResult.selectedConnector;
@@ -851,7 +851,7 @@ export default function HomePage() {
           mc.connector_name === loggedConnectorName || mc.merchant_connector_id === loggedConnectorName
         );
         const connectorNameForUpdate = foundConnector ? foundConnector.connector_name : loggedConnectorName;
-        await updateGatewayScore(merchantId, connectorNameForUpdate, isSuccess, currentControls, payment_id);
+        await updateGatewayScore(profileId, connectorNameForUpdate, isSuccess, currentControls, payment_id);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
@@ -1116,14 +1116,13 @@ export default function HomePage() {
   ]);
 
   useEffect(() => {
-    console.log("useEffect: Mounting, checking API credentials.");
     if (simulationState === 'running') {
       const timer = setTimeout(() => {
         processTransactionBatch();
-      }, 100);
+      }, 100); // 100ms delay between batches
       return () => clearTimeout(timer);
     }
-  }, [simulationState, processTransactionBatch]);
+  }, [simulationState, processedPaymentsCount]);
 
   const handleStartSimulation = useCallback(async (forceStart = false) => {
     const previousSimulationState = simulationState; // Capture state before any changes
@@ -1315,6 +1314,7 @@ export default function HomePage() {
             {!sidebarCollapsed && (
               <div className="flex flex-col min-h-screen h-auto overflow-y-auto">
                 <BottomControlsPanel
+                  initialValues={currentControls ?? undefined}
                   onFormChange={handleControlsChange}
                   merchantConnectors={merchantConnectors}
                   connectorToggleStates={connectorToggleStates}
