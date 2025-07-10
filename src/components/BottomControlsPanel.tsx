@@ -297,7 +297,7 @@ export function BottomControlsPanel({
             ruleActionProcessorId: undefined,
         });
     }
-}, [merchantConnectors, dynamicDefaults, form, initialValues]);
+}, [merchantConnectors, dynamicDefaults, form]);
 
 
   useEffect(() => {
