@@ -117,7 +117,7 @@ export default function HomePage() {
         toast({ title: "Rule Update Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
       } else {
         const responseData = await response.json();
-        console.log("[updateRuleConfiguration] Response Data:", responseData);
+        // console.log("[updateRuleConfiguration] Response Data:", responseData);
         toast({ title: "Rule Configuration Updated", description: "Success Rate Configuration updated successfully." });
       }
     } catch (error: any) {
@@ -255,7 +255,7 @@ export default function HomePage() {
       let routingApproachForLog: TransactionLogEntry['routingApproach'] = 'unknown';
 
       const data = await response.json();
-      console.log("[decideGateway] Response Data:", data);
+      // console.log("[decideGateway] Response Data:", data);
 
       console.log("gateway_priority_map for decision_engine :", data.gateway_priority_map);
 
@@ -333,7 +333,7 @@ export default function HomePage() {
       enforceDynamicRoutingFailure: null
     };
 
-    console.log("[UpdateSuccessRateWindow] Payload:", JSON.stringify(payload, null, 2));
+    // console.log("[UpdateSuccessRateWindow] Payload:", JSON.stringify(payload, null, 2));
 
     try {
       const response = await fetch('/demo/app/api/hs-proxy/update-gateway-score', {
@@ -463,7 +463,7 @@ export default function HomePage() {
             {
               paymentMethodType: "upi",
               paymentMethod: "upi_collect",
-              bucketSize: 250,
+              bucketSize: 30,
               hedgingPercent: 1
             }
           ]
@@ -911,49 +911,43 @@ export default function HomePage() {
   };
 
   const processTransactionBatch = useCallback(async () => {
-    console.log(
-      `PTB ENTRY: processed=${processedPaymentsCount}, total=${currentControls?.totalPayments}, stop=${isStoppingRef.current}, state=${simulationState}, proc=${isProcessingBatchRef.current}`
-    );
-
-    if (isStoppingRef.current || simulationState !== 'running') return;
-    if (isProcessingBatchRef.current) return;
-
+    if (isStoppingRef.current || simulationState !== 'running' || isProcessingBatchRef.current) {
+      return;
+    }
+  
     isProcessingBatchRef.current = true;
-
+  
     try {
       if (!currentControls || !apiKey || !profileId || !merchantId) {
         if (simulationState === 'running') {
-          isStoppingRef.current = true;
           setSimulationState('paused');
-          setIsApiCredentialsModalOpen(true);
           toast({ title: "Credentials Missing", description: "Enter API Key, Profile ID, and Merchant ID.", variant: "destructive" });
         }
         return;
       }
-
+  
       if (processedPaymentsCount >= currentControls.totalPayments) {
         if (!isStoppingRef.current) {
-          console.log("PTB: Target reached (early check), stopping.");
           isStoppingRef.current = true;
           setSimulationState('idle');
           toast({ title: "Simulation Completed", description: `All ${currentControls.totalPayments} payments processed.`, duration: 5000 });
         }
         return;
       }
-
+  
       apiCallAbortControllerRef.current = new AbortController();
       const { signal } = apiCallAbortControllerRef.current;
-
-      // Use batch size from controls or default to 1
+  
       const batchSize = currentControls.batchSize || 1;
       const remainingPayments = currentControls.totalPayments - processedPaymentsCount;
       const paymentsToProcessInBatch = Math.min(batchSize, remainingPayments);
-
-      if (paymentsToProcessInBatch <= 0) return;
-
-      // Create array of payment indices for this batch
+  
+      if (paymentsToProcessInBatch <= 0) {
+        isProcessingBatchRef.current = false;
+        return;
+      }
+  
       const batchIndices = Array.from({ length: paymentsToProcessInBatch }, (_, i) => processedPaymentsCount + i);
-
       let paymentsProcessedThisBatch = 0;
       let batchResults: SinglePaymentOutcome[] = []; // Use SinglePaymentOutcome[]
       const batchSpecificProcessorStats: Record<string, { successful: number; failed: number }> = {};
@@ -1125,65 +1119,32 @@ export default function HomePage() {
   }, [simulationState, processedPaymentsCount]);
 
   const handleStartSimulation = useCallback(async (forceStart = false) => {
-    const previousSimulationState = simulationState; // Capture state before any changes
-    console.log(`handleStartSimulation called. Current state: ${previousSimulationState}, forceStart: ${forceStart}`);
-
+    console.log("handleStartSimulation called");
     if (!apiKey || !profileId || !merchantId) {
       setIsApiCredentialsModalOpen(true);
       return;
     }
-
-    if (forceStart || merchantConnectors.length === 0) {
-      const connectors = await fetchMerchantConnectors(merchantId, apiKey);
-      if (connectors.length === 0 && !forceStart) {
-        toast({ title: "Error", description: "Failed to fetch merchant connectors.", variant: "destructive" });
-        return;
-      }
-    }
-
-    if (!currentControls && merchantConnectors.length > 0) {
-      const initialPwsr: ControlsState['processorWiseSuccessRates'] = {};
-      const initialPi: ControlsState['processorIncidents'] = {};
-      const initialPm: FormValues['processorMatrix'] = {};
-      merchantConnectors.forEach(c => {
-        const key = c.merchant_connector_id || c.connector_name;
-        initialPwsr[key] = { sr: 0, srDeviation: 0, volumeShare: 0, successfulPaymentCount: 0, totalPaymentCount: 0 };
-        initialPi[key] = null;
-        initialPm[key] = PAYMENT_METHODS.reduce((acc, m) => { acc[m] = false; return acc; }, {} as Record<PaymentMethod, boolean>);
-      });
-      setCurrentControls({
-        totalPayments: 1000, selectedPaymentMethods: [...PAYMENT_METHODS], processorMatrix: initialPm,
-        structuredRule: null, processorIncidents: initialPi, overallSuccessRate: 0,
-        processorWiseSuccessRates: initialPwsr,
-        numberOfBatches: 100, // New batch processing field
-        batchSize: 10, // New batch processing field
-        connectorWiseFailurePercentage: {}, // Initialize empty
-        isSuccessBasedRoutingEnabled: true, // Default to true
-      });
-    } else if (!currentControls) {
-      toast({ title: "Error", description: "Control data not available.", variant: "destructive" });
-      return;
-    }
-
-    if (previousSimulationState === 'idle' || forceStart) {
-      console.log("Resetting simulation state.");
-      resetSimulationState();
-    } else {
-      console.log("Not resetting simulation state (resuming or already running).");
-    }
-
-    isStoppingRef.current = false;
-    isProcessingBatchRef.current = false;
+    resetSimulationState();
     setSimulationState('running');
-    // Use previousSimulationState for the toast message to accurately reflect the action taken
-    toast({ title: `Simulation ${previousSimulationState === 'idle' || forceStart ? 'Started' : 'Resumed'}`, description: `Processing ${currentControls?.totalPayments || 0} payments.` });
-  }, [currentControls, apiKey, profileId, merchantId, merchantConnectors, toast, simulationState]); // simulationState is still a dependency for useCallback re-creation if needed by other parts of its logic, even if previousSimulationState is used for the toast.
+    toast({ title: "Simulation Started", description: `Processing ${currentControls?.totalPayments || 0} payments.` });
+  }, [apiKey, profileId, merchantId, currentControls, toast]);
+  
+  const handleResumeSimulation = useCallback(() => {
+    console.log("handleResumeSimulation called");
+    if (simulationState === 'paused') {
+      isStoppingRef.current = false;
+      setSimulationState('running');
+      toast({ title: "Simulation Resumed" });
+    }
+  }, [simulationState, toast]);
 
   const handlePauseSimulation = useCallback(() => {
     if (simulationState === 'running') {
       isStoppingRef.current = true;
       setSimulationState('paused');
-      if (apiCallAbortControllerRef.current) apiCallAbortControllerRef.current.abort();
+      if (apiCallAbortControllerRef.current) {
+        apiCallAbortControllerRef.current.abort();
+      }
       toast({ title: "Simulation Paused" });
     }
   }, [simulationState, toast]);
@@ -1254,13 +1215,13 @@ export default function HomePage() {
     if (simulationState !== 'idle') {
       isStoppingRef.current = true;
       setSimulationState('idle');
-      if (apiCallAbortControllerRef.current) apiCallAbortControllerRef.current.abort();
-      toast({ title: "Simulation Stopped", description: `Processed ${processedPaymentsCount} payments.` });
-      // if (transactionLogs.length > 0) {
-      //   handleRequestAiSummary();
-      // }
+      if (apiCallAbortControllerRef.current) {
+        apiCallAbortControllerRef.current.abort();
+      }
+      resetSimulationState();
+      toast({ title: "Simulation Stopped" });
     }
-  }, [simulationState, processedPaymentsCount, toast, transactionLogs]);
+  }, [simulationState, toast]);
 
   // Effect to trigger summary when simulation completes naturally
   // useEffect(() => {
@@ -1293,8 +1254,11 @@ export default function HomePage() {
           <Header
             activeTab={parentTab}
             onTabChange={() => {}}
-            onStartSimulation={handleStartSimulation} onPauseSimulation={handlePauseSimulation}
-            onStopSimulation={handleStopSimulation} simulationState={simulationState}
+            onStartSimulation={handleStartSimulation}
+            onPauseSimulation={handlePauseSimulation}
+            onStopSimulation={handleStopSimulation}
+            onResumeSimulation={handleResumeSimulation}
+            simulationState={simulationState}
           />
           <div
             className={`flex flex-row flex-grow overflow-hidden`}

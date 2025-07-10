@@ -234,6 +234,7 @@ export function BottomControlsPanel({
       connectorWiseFailurePercentage: dynamicDefaults.connectorWiseFailurePercentage,
       connectorWiseTestCards: dynamicDefaults.connectorWiseTestCardsInit, // Initialize here
       explorationPercent: 20, // Default value for explorationPercent
+      bucketSize: 30,
       selectedRoutingParams: {
         PaymentMethod: true,
         PaymentMethodType: true,
@@ -632,7 +633,7 @@ export function BottomControlsPanel({
                               <FormItem>
                                 <FormLabel className="text-xs">Bucket Size (bucketSize)</FormLabel>
                                 <FormControl>
-                                  <Input type="number" placeholder="e.g., 5" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} min="0" className="bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border text-gray-900 dark:text-white rounded-md px-3 py-2" />
+                                  <Input type="number" placeholder="e.g., 30" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} min="0" className="bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border text-gray-900 dark:text-white rounded-md px-3 py-2" />
                                 </FormControl>
                                 <FormDescription className="text-xs">Bucket size for SR calculation (for /fetch).</FormDescription>
                                 <FormMessage />

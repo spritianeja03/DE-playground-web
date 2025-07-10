@@ -9,6 +9,7 @@ interface HeaderProps {
   onStartSimulation: () => void;
   onPauseSimulation: () => void;
   onStopSimulation: () => void;
+  onResumeSimulation: () => void;
   simulationState: 'idle' | 'running' | 'paused';
 }
 
@@ -18,6 +19,7 @@ export function Header({
   onStartSimulation,
   onPauseSimulation,
   onStopSimulation,
+  onResumeSimulation,
   simulationState
 }: HeaderProps) {
   const isSimulating = simulationState === 'running';
@@ -55,10 +57,16 @@ export function Header({
       </div>
 
       <div className="flex items-center gap-2">
-        {(isIdle || isPaused) && (
-          <Button onClick={onStartSimulation} disabled={isSimulating} variant="primary" size="default">
-            {isSimulating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-2 h-5 w-5" />}
-            {isPaused ? 'Resume Simulation' : 'Start Simulation'}
+        {isIdle && (
+          <Button onClick={onStartSimulation} variant="primary" size="default">
+            <PlayCircle className="mr-2 h-5 w-5" />
+            Start Simulation
+          </Button>
+        )}
+        {isPaused && (
+          <Button onClick={onResumeSimulation} variant="primary" size="default">
+            <PlayCircle className="mr-2 h-5 w-5" />
+            Resume Simulation
           </Button>
         )}
         {isSimulating && (
