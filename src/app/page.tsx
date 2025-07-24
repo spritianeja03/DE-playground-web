@@ -24,6 +24,7 @@ import { MiniSidebar } from '@/components/MiniSidebar';
 const LOCALSTORAGE_API_KEY = 'hyperswitch_apiKey';
 const LOCALSTORAGE_PROFILE_ID = 'hyperswitch_profileId';
 const LOCALSTORAGE_MERCHANT_ID = 'hyperswitch_merchantId';
+const LOCALSTORAGE_ROUTING_ID = 'hyperswitch_routingId';
 
 // Type for the outcome of a single payment processing attempt
 interface SinglePaymentOutcome {
@@ -72,17 +73,17 @@ export default function HomePage() {
   const { toast } = useToast();
 
   const updateRuleConfiguration = useCallback(async (
-    merchantId: string,
+    profileId: string,
     explorationPercent: number,
     bucketSize: number
   ) => {
-    if (!merchantId) {
-      console.warn("[updateRuleConfiguration] Missing merchantId.");
+    if (!profileId) {
+      console.warn("[updateRuleConfiguration] Missing profileId.");
       return;
     }
 
     const payload = {
-      merchant_id: merchantId,
+      merchant_id: profileId,
       config: {
         type: "successRate",
         data: {
@@ -175,7 +176,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const handler = setTimeout(() => {
-      if (currentControls && merchantId) {
+      if (currentControls && merchantId && prevControlsRef.current) {
         const prevControls = prevControlsRef.current;
         const currentExplorationPercent = currentControls.explorationPercent;
         const currentBucketSize = currentControls.bucketSize;
@@ -190,7 +191,7 @@ export default function HomePage() {
           (currentExplorationPercent !== prevExplorationPercent || currentBucketSize !== prevBucketSize)
         ) {
           console.log("Exploration percentage or bucket size changed. Updating rule configuration.");
-          updateRuleConfiguration(merchantId, currentExplorationPercent, currentBucketSize);
+          updateRuleConfiguration(profileId, currentExplorationPercent, currentBucketSize);
         }
       }
       prevControlsRef.current = currentControls;
@@ -199,7 +200,7 @@ export default function HomePage() {
     return () => {
       clearTimeout(handler);
     };
-  }, [currentControls, merchantId, updateRuleConfiguration]);
+  }, [currentControls, profileId, updateRuleConfiguration]);
 
   const decideGateway = useCallback(async (
     currentControls: FormValues,
@@ -220,7 +221,7 @@ export default function HomePage() {
       eliminationEnabled: false,
       paymentInfo: {
         paymentId: paymentId,
-        amount: 100.50,
+        amount: 1000,
         currency: "USD",
         customerId: "CUST12345",
         udfs: null,
@@ -231,8 +232,8 @@ export default function HomePage() {
         isEmi: false,
         emiBank: null,
         emiTenure: null,
-        paymentMethodType: "UPI",
-        paymentMethod: "UPI_PAY",
+        paymentMethodType: "credit",
+        paymentMethod: "card",
         paymentSource: null,
         authType: null,
         cardIssuerBankName: null,
@@ -382,119 +383,6 @@ export default function HomePage() {
     });
   }, []);
 
-  const createMerchantIdForDecisionEngine = async (currentProfileId: string): Promise<string | void> => {
-    if (!currentProfileId) {
-      console.warn("[createMerchantIdForDecisionEngine] Missing currentProfileId. Cannot create decision engine merchant ID.");
-      return;
-    }
-
-    setIsLoadingMerchantConnectors(true); 
-
-    try {
-      const response = await fetch('/demo/app/api/hs-proxy/merchant-account/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-feature': 'decision-engine'
-        },
-        body: JSON.stringify({
-          merchant_id: currentProfileId,
-        }),
-      });
-
-      let data: any = {}; // Initialize data to an empty object
-      try {
-        data = await response.json(); // Attempt to parse JSON for logging
-      } catch (e) {
-        console.warn("[createMerchantIdForDecisionEngine] Failed to parse JSON response body, or body was empty.", e);
-        // data remains {}
-      }
-      
-      console.log("[createMerchantIdForDecisionEngine] API Response Status:", response.status, "Response Data:", data);
-
-      if (response.ok) { // Primary check: HTTP status indicates success (e.g., 200-299)
-        console.log(`[createMerchantIdForDecisionEngine] Merchant account creation API call successful (HTTP ${response.status}).`);
-        
-        // Optional: Further check based on expected body content like data.ok
-        if (data && data.ok === true) {
-             console.log("[createMerchantIdForDecisionEngine] Confirmation: data.ok is true.");
-             toast({ title: "Decision Engine Setup", description: "Merchant account for decision engine confirmed.", variant: "default" }); // Changed "success" to "default"
-        } else if (data && data.ok === false) {
-            console.warn("[createMerchantIdForDecisionEngine] Warning: HTTP call successful, but response body indicates data.ok is false. Body:", data);
-            toast({ title: "Decision Engine Setup", description: "Merchant account for decision engine initiated (API reported specific status).", variant: "default" });
-        } else {
-            console.log("[createMerchantIdForDecisionEngine] Info: HTTP call successful. Response body did not contain 'ok' field or it was not boolean. Body:", data);
-            toast({ title: "Decision Engine Setup", description: "Merchant account for decision engine initiated.", variant: "default" });
-        }
-        return profileId;
-      } else {
-        // HTTP error (e.g., 4xx, 5xx)
-        const errorMessage = data?.message || data?.error?.message || `API Error HTTP ${response.status}`;
-        console.error(`[createMerchantIdForDecisionEngine] API Error HTTP ${response.status}:`, errorMessage, "Full data:", data);
-        toast({ title: "Decision Engine Setup Failed", description: errorMessage, variant: "destructive" });
-        // Implicitly returns undefined
-      }
-    } catch (error: any) { // Catch network errors or other unexpected issues
-      console.error("[createMerchantIdForDecisionEngine] Exception during API call:", error);
-      toast({ title: "Network Error", description: `Failed to set up decision engine merchant: ${error.message}`, variant: "destructive" });
-      // Implicitly returns undefined
-    } finally {
-      setIsLoadingMerchantConnectors(false);
-    }
-    // If function reaches here, it means an error occurred or response.ok was false,
-    // and currentMerchantId was not returned. So, it returns undefined.
-  }
-
-  const createSrRuleForDecisonEngine = async (currentMerchantId: string): Promise<string | null> => {
-    if (!currentMerchantId) {
-      console.warn("[createSrRuleForDecisonEngine] Missing currentMerchantId.");
-      return null;
-    }
-    const payload = {
-      merchant_id: currentMerchantId,
-      config: {
-        type: "successRate",
-        data: {
-          defaultLatencyThreshold: 90,
-          defaultSuccessRate: 100,
-          defaultBucketSize: 200,
-          defaultHedgingPercent: 5,
-          subLevelInputConfig: [
-            {
-              paymentMethodType: "upi",
-              paymentMethod: "upi_collect",
-              bucketSize: 30,
-              hedgingPercent: 1
-            }
-          ]
-        }
-      }
-    }
-    try {
-      const response = await fetch('/demo/app/api/hs-proxy/rule/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-feature': 'decision-engine'
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-      console.log("[SR Rule for decision engine] Response Data:", data);
-      if (data.ok) {
-        console.log("[SR Rule create] SR rule created successfully.");
-        toast({ title: "[Rule creation for Decision engine]", description: "Rule created successfully." });
-      }
-    } catch (error) {
-      console.error("[SR Rule create] Error creating SR rule:", error);
-      toast({ title: "SR Rule Creation Error", description: String(error), variant: "destructive" });
-    } finally {
-      setIsLoadingMerchantConnectors(false);
-    }
-    return null; // Ensure a return statement for all code paths
-  }
-
   const fetchMerchantConnectors = async (currentMerchantId: string, currentApiKey: string): Promise<MerchantConnector[]> => {
     console.log("fetchMerchantConnectors called with Merchant ID:", currentMerchantId);
     if (!currentMerchantId || !currentApiKey) {
@@ -576,6 +464,60 @@ export default function HomePage() {
     }
   };
 
+  const toggleSrRule = async (currentMerchantId: string, currentProfileId: string, currentApiKey: string) => {
+    if (!currentMerchantId || !currentProfileId || !currentApiKey) {
+      toast({ title: "Error", description: "Merchant ID, Profile ID and API Key are required to toggle SR rule.", variant: "destructive" });
+      return;
+    }
+    try {
+      const response = await fetch(`https://sandbox.hyperswitch.io/account/${currentMerchantId}/business_profile/${currentProfileId}/dynamic_routing/success_based/toggle?enable=dynamic_connector_selection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'api-key': currentApiKey,
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Failed to toggle SR rule, unknown error." }));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const responseData = await response.json();
+      console.log("Toggle SR rule response:", responseData);
+      toast({ title: "Success", description: "SR rule toggled." });
+      return responseData;
+    } catch (error: any) {
+      console.error("Error toggling SR rule:", error);
+      toast({ title: "Failed to Toggle SR Rule", description: error.message || "Could not toggle SR rule.", variant: "destructive" });
+      return null;
+    }
+  };
+
+  const setVolumeSplit = async (currentMerchantId: string, currentProfileId: string, currentApiKey: string) => {
+    if (!currentMerchantId || !currentProfileId || !currentApiKey) {
+      toast({ title: "Error", description: "Merchant ID, Profile ID and API Key are required to set volume split.", variant: "destructive" });
+      return;
+    }
+    try {
+      const response = await fetch(`https://sandbox.hyperswitch.io/account/${currentMerchantId}/business_profile/${currentProfileId}/dynamic_routing/set_volume_split?split=100`, {
+        method: 'POST',
+        headers: {
+          'api-key': currentApiKey,
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Failed to set volume split, unknown error." }));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const responseData = await response.json();
+      console.log("Set volume split response:", responseData);
+      toast({ title: "Success", description: "Volume split set." });
+    } catch (error: any) {
+      console.error("Error setting volume split:", error);
+      toast({ title: "Failed to Set Volume Split", description: error.message || "Could not set volume split.", variant: "destructive" });
+    }
+  };
+
   const handleConnectorToggleChange = async (connectorId: string, newState: boolean) => {
     const originalState = connectorToggleStates[connectorId];
     setConnectorToggleStates(prev => ({ ...prev, [connectorId]: newState }));
@@ -611,27 +553,31 @@ export default function HomePage() {
       toast({ title: "API Credentials Required", description: "Please enter all API credentials.", variant: "destructive" });
       return;
     }
-    const localStorageProfileId = localStorage.getItem(LOCALSTORAGE_PROFILE_ID);
     
-    if(localStorageProfileId === profileId){
-      setIsApiCredentialsModalOpen(false);
-      fetchMerchantConnectors(merchantId, apiKey);
-    }
-    else{
-      setIsApiCredentialsModalOpen(false);
-      fetchMerchantConnectors(merchantId, apiKey);
-      const decisionEngineMerchantId = await createMerchantIdForDecisionEngine(profileId);
-      console.log(">>>Merchant ID for Decision Engine:", decisionEngineMerchantId);
-      if (decisionEngineMerchantId) {
-        createSrRuleForDecisonEngine(decisionEngineMerchantId);
+    setIsApiCredentialsModalOpen(false);
+    
+    await fetchMerchantConnectors(merchantId, apiKey);
+    
+    const toggleResponse = await toggleSrRule(merchantId, profileId, apiKey);
+    
+    if (toggleResponse && toggleResponse.id) {
+      const storedRoutingId = localStorage.getItem(LOCALSTORAGE_ROUTING_ID);
+      console.log("Stored Routing ID:", storedRoutingId);
+      console.log("New Routing ID from API:", toggleResponse.id);
+      if (storedRoutingId !== toggleResponse.id) {
+        console.log("Routing ID is new. Updating local storage and calling setVolumeSplit.");
+        localStorage.setItem(LOCALSTORAGE_ROUTING_ID, toggleResponse.id);
+        await setVolumeSplit(merchantId, profileId, apiKey);
+      } else {
+        console.log("Routing ID is the same. Not calling setVolumeSplit.");
       }
+    } else {
+      console.log("No id in toggle response.");
     }
     
-
-      localStorage.setItem(LOCALSTORAGE_API_KEY, apiKey);
-      localStorage.setItem(LOCALSTORAGE_PROFILE_ID, profileId);
-      localStorage.setItem(LOCALSTORAGE_MERCHANT_ID, merchantId);
-    
+    localStorage.setItem(LOCALSTORAGE_API_KEY, apiKey);
+    localStorage.setItem(LOCALSTORAGE_PROFILE_ID, profileId);
+    localStorage.setItem(LOCALSTORAGE_MERCHANT_ID, merchantId);
   };
 
   const resetSimulationState = () => {
