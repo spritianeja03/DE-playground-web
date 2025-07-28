@@ -244,11 +244,12 @@ export default function HomePage() {
     };
 
     try {
-      const response = await fetch('/demo/app/api/hs-proxy/decide-gateway', {
+      const response = await fetch('/demo/app/api/hs-proxy/routing/evaluate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-feature': 'decision-engine'
+          'api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+          // 'x-feature': 'decision-engine'
         },
         body: JSON.stringify(payload),
       });
@@ -337,11 +338,12 @@ export default function HomePage() {
     // console.log("[UpdateSuccessRateWindow] Payload:", JSON.stringify(payload, null, 2));
 
     try {
-      const response = await fetch('/demo/app/api/hs-proxy/update-gateway-score', {
+      const response = await fetch('/demo/app/api/hs-proxy/routing/feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-feature': 'decision-engine'
+          // 'x-feature': 'decision-engine'
+          'api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || ''
         },
         body: JSON.stringify(payload),
       });
