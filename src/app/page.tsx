@@ -11,6 +11,7 @@ import { StatsView } from '@/components/StatsView';
 import { AnalyticsGraphsView } from '@/components/AnalyticsGraphsView';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react'; 
 import ReactMarkdown from 'react-markdown';
@@ -25,6 +26,7 @@ const LOCALSTORAGE_API_KEY = 'hyperswitch_apiKey';
 const LOCALSTORAGE_PROFILE_ID = 'hyperswitch_profileId';
 const LOCALSTORAGE_MERCHANT_ID = 'hyperswitch_merchantId';
 const LOCALSTORAGE_ROUTING_ID = 'hyperswitch_routingId';
+const LOCALSTORAGE_ENV = 'hyperswitch_env';
 
 // Type for the outcome of a single payment processing attempt
 interface SinglePaymentOutcome {
@@ -47,6 +49,7 @@ export default function HomePage() {
   const [apiKey, setApiKey] = useState<string>('');
   const [profileId, setProfileId] = useState<string>('');
   const [merchantId, setMerchantId] = useState<string>('');
+  const [env, setEnv] = useState<string>('integ');
 
   const [merchantConnectors, setMerchantConnectors] = useState<MerchantConnector[]>([]);
   const [connectorToggleStates, setConnectorToggleStates] = useState<Record<string, boolean>>({});
@@ -73,9 +76,11 @@ export default function HomePage() {
   const { toast } = useToast();
 
   const updateRuleConfiguration = useCallback(async (
+    merchantId: string,
     profileId: string,
     explorationPercent: number,
-    bucketSize: number
+    bucketSize: number,
+    toggle_routing_id: string
   ) => {
     if (!profileId) {
       console.warn("[updateRuleConfiguration] Missing profileId.");
@@ -83,10 +88,10 @@ export default function HomePage() {
     }
 
     const payload = {
-      merchant_id: profileId,
-      config: {
-        type: "successRate",
-        data: {
+      // merchant_id: profileId,
+      decision_engine_configs: {
+        // type: "successRate",
+        // data: {
           defaultLatencyThreshold: 90,
           defaultSuccessRate: 100,
           defaultBucketSize: 200,
@@ -98,16 +103,18 @@ export default function HomePage() {
               hedgingPercent: explorationPercent 
             }
           ]
-        }
+        // }
       }
     };
 
     try {
-      const response = await fetch('/demo/app/api/hs-proxy/rule/update', {
-        method: 'POST',
+      const response = await fetch(`/demo/app/api/hs-proxy/account/${merchantId}/business_profile/${profileId}/dynamic_routing/success_based/config/${toggle_routing_id}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-feature': 'decision-engine'
+          'Accept': 'application/json',
+          'x-env': env,
+          'x-api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
         },
         body: JSON.stringify(payload),
       });
@@ -125,7 +132,7 @@ export default function HomePage() {
       console.error("[updateRuleConfiguration] Fetch Error:", error);
       toast({ title: "Rule Update Network Error", description: error.message, variant: "destructive" });
     }
-  }, [toast]);
+  }, [env, toast]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -143,6 +150,7 @@ export default function HomePage() {
       const storedApiKey = localStorage.getItem(LOCALSTORAGE_API_KEY);
       const storedProfileId = localStorage.getItem(LOCALSTORAGE_PROFILE_ID);
       const storedMerchantId = localStorage.getItem(LOCALSTORAGE_MERCHANT_ID);
+      const storedEnv = localStorage.getItem(LOCALSTORAGE_ENV);
       let allCredentialsFound = true; // Initialize here
 
       if (storedApiKey) {
@@ -161,6 +169,10 @@ export default function HomePage() {
         setMerchantId(storedMerchantId);
       } else {
         allCredentialsFound = false;
+      }
+
+      if (storedEnv) {
+        setEnv(storedEnv);
       }
 
       // Always open the modal on refresh
@@ -191,7 +203,13 @@ export default function HomePage() {
           (currentExplorationPercent !== prevExplorationPercent || currentBucketSize !== prevBucketSize)
         ) {
           console.log("Exploration percentage or bucket size changed. Updating rule configuration.");
-          updateRuleConfiguration(profileId, currentExplorationPercent, currentBucketSize);
+            // Get the routing ID from localStorage (set after SR toggle)
+            const routingId = localStorage.getItem(LOCALSTORAGE_ROUTING_ID);
+            if (routingId) {
+            updateRuleConfiguration(merchantId, profileId, currentExplorationPercent, currentBucketSize, routingId);
+            } else {
+            console.warn("No routing ID found in localStorage. Skipping rule configuration update.");
+            }
         }
       }
       prevControlsRef.current = currentControls;
@@ -244,11 +262,21 @@ export default function HomePage() {
     };
 
     try {
-      const response = await fetch('/demo/app/api/hs-proxy/decide-gateway', {
+      // const response = await fetch('/demo/app/api/hs-proxy/decide-gateway', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'x-feature': 'decision-engine'
+      //   },
+      //   body: JSON.stringify(payload),
+      // });
+      const baseUrl = env === 'integ' ? 'https://integ-api.hyperswitch.io' : env === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/routing/evaluate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-feature': 'decision-engine'
+          // 'x-feature': 'decision-engine'
+          'api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
         },
         body: JSON.stringify(payload),
       });
@@ -305,7 +333,7 @@ export default function HomePage() {
       toast({ title: "Decide Gateway Network Error", description: error.message, variant: "destructive" });
       return { selectedConnector: null, routingApproach: 'unknown', srScores: undefined };
     }
-  }, [toast]);
+  }, [env, toast]);
 
 
   const updateGatewayScore = useCallback(async (
@@ -337,11 +365,21 @@ export default function HomePage() {
     // console.log("[UpdateSuccessRateWindow] Payload:", JSON.stringify(payload, null, 2));
 
     try {
-      const response = await fetch('/demo/app/api/hs-proxy/update-gateway-score', {
+      // const response = await fetch('/demo/app/api/hs-proxy/update-gateway-score', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'x-feature': 'decision-engine'
+      //   },
+      //   body: JSON.stringify(payload),
+      // });
+      const baseUrl = env === 'integ' ? 'https://integ-api.hyperswitch.io' : env === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/routing/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-feature': 'decision-engine'
+          // 'x-feature': 'decision-engine'
+          'api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
         },
         body: JSON.stringify(payload),
       });
@@ -370,7 +408,7 @@ export default function HomePage() {
     } catch (error: any) {
       console.error("[UpdateSuccessRateWindow] Fetch Error:", error);
     }
-  }, [toast]);
+  }, [env, toast]);
 
   const handleControlsChange = useCallback((data: FormValues) => {
     setCurrentControls(prev => {
@@ -383,7 +421,7 @@ export default function HomePage() {
     });
   }, []);
 
-  const fetchMerchantConnectors = async (currentMerchantId: string, currentApiKey: string): Promise<MerchantConnector[]> => {
+  const fetchMerchantConnectors = async (currentMerchantId: string, currentApiKey: string, currentEnv: string): Promise<MerchantConnector[]> => {
     console.log("fetchMerchantConnectors called with Merchant ID:", currentMerchantId);
     if (!currentMerchantId || !currentApiKey) {
       toast({ title: "Error", description: "Merchant ID and API Key are required to fetch connectors.", variant: "destructive" });
@@ -396,7 +434,8 @@ export default function HomePage() {
         setIsLoadingMerchantConnectors(false);
         return [];
       }
-      const response = await fetch(`https://sandbox.hyperswitch.io/account/${currentMerchantId}/profile/connectors`, {
+      const baseUrl = currentEnv === 'integ' ? 'https://integ-api.hyperswitch.io' : currentEnv === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/account/${currentMerchantId}/profile/connectors`, {
         method: 'GET',
         headers: { 'api-key': currentApiKey, 'x-profile-id': profileId },
       });
@@ -464,13 +503,14 @@ export default function HomePage() {
     }
   };
 
-  const toggleSrRule = async (currentMerchantId: string, currentProfileId: string, currentApiKey: string) => {
+  const toggleSrRule = async (currentMerchantId: string, currentProfileId: string, currentApiKey: string, currentEnv: string) => {
     if (!currentMerchantId || !currentProfileId || !currentApiKey) {
       toast({ title: "Error", description: "Merchant ID, Profile ID and API Key are required to toggle SR rule.", variant: "destructive" });
       return;
     }
     try {
-      const response = await fetch(`https://sandbox.hyperswitch.io/account/${currentMerchantId}/business_profile/${currentProfileId}/dynamic_routing/success_based/toggle?enable=dynamic_connector_selection`, {
+      const baseUrl = currentEnv === 'integ' ? 'https://integ-api.hyperswitch.io' : currentEnv === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/account/${currentMerchantId}/business_profile/${currentProfileId}/dynamic_routing/success_based/toggle?enable=dynamic_connector_selection`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -493,13 +533,14 @@ export default function HomePage() {
     }
   };
 
-  const setVolumeSplit = async (currentMerchantId: string, currentProfileId: string, currentApiKey: string) => {
+  const setVolumeSplit = async (currentMerchantId: string, currentProfileId: string, currentApiKey: string, currentEnv: string) => {
     if (!currentMerchantId || !currentProfileId || !currentApiKey) {
       toast({ title: "Error", description: "Merchant ID, Profile ID and API Key are required to set volume split.", variant: "destructive" });
       return;
     }
     try {
-      const response = await fetch(`https://sandbox.hyperswitch.io/account/${currentMerchantId}/business_profile/${currentProfileId}/dynamic_routing/set_volume_split?split=100`, {
+      const baseUrl = currentEnv === 'integ' ? 'https://integ-api.hyperswitch.io' : currentEnv === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/account/${currentMerchantId}/business_profile/${currentProfileId}/dynamic_routing/set_volume_split?split=100`, {
         method: 'POST',
         headers: {
           'api-key': currentApiKey,
@@ -518,7 +559,7 @@ export default function HomePage() {
     }
   };
 
-  const handleConnectorToggleChange = async (connectorId: string, newState: boolean) => {
+  const handleConnectorToggleChange = useCallback(async (connectorId: string, newState: boolean) => {
     const originalState = connectorToggleStates[connectorId];
     setConnectorToggleStates(prev => ({ ...prev, [connectorId]: newState }));
 
@@ -532,7 +573,8 @@ export default function HomePage() {
     const connectorTypeForAPI = connectorToUpdate?.connector_type || "payment_processor";
 
     try {
-      const response = await fetch(`https://sandbox.hyperswitch.io/account/${merchantId}/connectors/${connectorId}`, {
+      const baseUrl = env === 'integ' ? 'https://integ-api.hyperswitch.io' : env === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/account/${merchantId}/connectors/${connectorId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'api-key': apiKey },
         body: JSON.stringify({ connector_type: connectorTypeForAPI, disabled: !newState }),
@@ -546,7 +588,7 @@ export default function HomePage() {
       toast({ title: "Update Failed", description: error.message, variant: "destructive" });
       setConnectorToggleStates(prev => ({ ...prev, [connectorId]: originalState }));
     }
-  };
+  }, [connectorToggleStates, merchantId, apiKey, merchantConnectors, env, toast]);
 
   const handleApiCredentialsSubmit = async () => {
     if (!apiKey || !profileId || !merchantId) {
@@ -556,9 +598,9 @@ export default function HomePage() {
     
     setIsApiCredentialsModalOpen(false);
     
-    await fetchMerchantConnectors(merchantId, apiKey);
+    await fetchMerchantConnectors(merchantId, apiKey, env);
     
-    const toggleResponse = await toggleSrRule(merchantId, profileId, apiKey);
+    const toggleResponse = await toggleSrRule(merchantId, profileId, apiKey, env);
     
     if (toggleResponse && toggleResponse.id) {
       const storedRoutingId = localStorage.getItem(LOCALSTORAGE_ROUTING_ID);
@@ -567,7 +609,7 @@ export default function HomePage() {
       if (storedRoutingId !== toggleResponse.id) {
         console.log("Routing ID is new. Updating local storage and calling setVolumeSplit.");
         localStorage.setItem(LOCALSTORAGE_ROUTING_ID, toggleResponse.id);
-        await setVolumeSplit(merchantId, profileId, apiKey);
+        await setVolumeSplit(merchantId, profileId, apiKey, env);
       } else {
         console.log("Routing ID is the same. Not calling setVolumeSplit.");
       }
@@ -578,6 +620,7 @@ export default function HomePage() {
     localStorage.setItem(LOCALSTORAGE_API_KEY, apiKey);
     localStorage.setItem(LOCALSTORAGE_PROFILE_ID, profileId);
     localStorage.setItem(LOCALSTORAGE_MERCHANT_ID, merchantId);
+    localStorage.setItem(LOCALSTORAGE_ENV, env);
   };
 
   const resetSimulationState = () => {
@@ -742,7 +785,18 @@ export default function HomePage() {
     let logEntry: TransactionLogEntry | null = null;
 
     try {
-      const response = await fetch('/demo/app/api/hs-proxy/payments', {
+      // const response = await fetch('/demo/app/api/hs-proxy/payments', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Accept': 'application/json',
+      //     'api-key': apiKey
+      //   },
+      //   body: JSON.stringify(paymentData),
+      //   signal,
+      // });
+      const baseUrl = env === 'integ' ? 'https://integ-api.hyperswitch.io' : env === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1340,6 +1394,19 @@ export default function HomePage() {
             <div><Label htmlFor="apiKey">API Key</Label><Input id="apiKey" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Enter API Key" /></div>
             <div><Label htmlFor="profileId">Profile ID</Label><Input id="profileId" type="text" value={profileId} onChange={(e) => setProfileId(e.target.value)} placeholder="Enter Profile ID" /></div>
             <div><Label htmlFor="merchantId">Merchant ID</Label><Input id="merchantId" type="text" value={merchantId} onChange={(e) => setMerchantId(e.target.value)} placeholder="Enter Merchant ID" /></div>
+            <div>
+              <Label htmlFor="env">Environment</Label>
+              <Select value={env} onValueChange={setEnv}>
+                <SelectTrigger id="env">
+                  <SelectValue placeholder="Select Environment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="integ">Integ</SelectItem>
+                  <SelectItem value="sandbox">Sandbox</SelectItem>
+                  <SelectItem value="local">Local</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setIsApiCredentialsModalOpen(false)}>Cancel</Button>
