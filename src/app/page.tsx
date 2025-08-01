@@ -930,7 +930,10 @@ export default function HomePage() {
         if (!isStoppingRef.current) {
           isStoppingRef.current = true;
           setSimulationState('idle');
-          toast({ title: "Simulation Completed", description: `All ${currentControls.totalPayments} payments processed.`, duration: 5000 });
+          // Defer toast to avoid setState during render
+          setTimeout(() => {
+            toast({ title: "Simulation Completed", description: `All ${currentControls.totalPayments} payments processed.`, duration: 5000 });
+          }, 0);
         }
         return;
       }
@@ -1030,7 +1033,10 @@ export default function HomePage() {
             console.log("PTB: Target reached in setProcessedPaymentsCount, setting to idle.");
             isStoppingRef.current = true;
             setSimulationState('idle');
-            toast({ title: "Simulation Completed", description: `All ${currentControls.totalPayments} payments processed.`, duration: 5000 });
+            // Defer toast to avoid setState during render
+            setTimeout(() => {
+              toast({ title: "Simulation Completed", description: `All ${currentControls.totalPayments} payments processed.`, duration: 5000 });
+            }, 0);
           }
           return newTotalProcessed;
         });
