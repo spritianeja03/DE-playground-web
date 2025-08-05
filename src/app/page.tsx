@@ -262,21 +262,12 @@ export default function HomePage() {
     };
 
     try {
-      // const response = await fetch('/demo/app/api/hs-proxy/decide-gateway', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'x-feature': 'decision-engine'
-      //   },
-      //   body: JSON.stringify(payload),
-      // });
-      const baseUrl = env === 'integ' ? 'https://integ-api.hyperswitch.io' : env === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
-      const response = await fetch(`${baseUrl}/routing/evaluate`, {
+      const response = await fetch('/demo/app/api/hs-proxy/routing/evaluate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // 'x-feature': 'decision-engine'
           'api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+          // 'x-feature': 'decision-engine'
         },
         body: JSON.stringify(payload),
       });
@@ -365,21 +356,12 @@ export default function HomePage() {
     // console.log("[UpdateSuccessRateWindow] Payload:", JSON.stringify(payload, null, 2));
 
     try {
-      // const response = await fetch('/demo/app/api/hs-proxy/update-gateway-score', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'x-feature': 'decision-engine'
-      //   },
-      //   body: JSON.stringify(payload),
-      // });
-      const baseUrl = env === 'integ' ? 'https://integ-api.hyperswitch.io' : env === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
-      const response = await fetch(`${baseUrl}/routing/feedback`, {
+      const response = await fetch('/demo/app/api/hs-proxy/routing/feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           // 'x-feature': 'decision-engine'
-          'api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+          'api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || ''
         },
         body: JSON.stringify(payload),
       });
