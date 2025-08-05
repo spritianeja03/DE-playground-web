@@ -8,13 +8,12 @@ interface RequestInitWithDuplex extends RequestInit {
 async function handler(req: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
   const { slug } = await params;
   const path = slug.join('/');
-  const env = req.headers.get('x-env') || 'sandbox';
-  console.log(`[HS_PROXY] Environment header: '${req.headers.get('x-env')}', resolved env: '${env}'`);
+  const baseUrl = req.headers.get('x-base-url') || 'https://sandbox.hyperswitch.io';
+  console.log(`[HS_PROXY] Base URL header: '${req.headers.get('x-base-url')}', resolved baseUrl: '${baseUrl}'`);
   
-  const HYPERSWITCH_API_BASE_URL = env === 'integ' ? 'https://integ-api.hyperswitch.io' : env === 'sandbox' ? 'https://sandbox.hyperswitch.io' : 'http://localhost:8080';
-  const targetUrl = `${HYPERSWITCH_API_BASE_URL}/${path}`;
+  const targetUrl = `${baseUrl}/${path}`;
   
-  console.log(`[HS_PROXY] Base URL: ${HYPERSWITCH_API_BASE_URL}, Target URL: ${targetUrl}`);
+  console.log(`[HS_PROXY] Base URL: ${baseUrl}, Target URL: ${targetUrl}`);
 
   const headers = new Headers();
   // Forward essential headers from the client
