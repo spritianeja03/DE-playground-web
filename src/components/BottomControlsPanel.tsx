@@ -343,6 +343,15 @@ export function BottomControlsPanel({
 
   const { control, setValue } = form;
 
+  // Handle totalPayments calculation outside of render
+  const numberOfBatches = form.watch('numberOfBatches') || 100;
+  const batchSize = form.watch('batchSize') || 10;
+  const calculatedTotal = numberOfBatches * batchSize;
+  
+  useEffect(() => {
+    form.setValue('totalPayments', calculatedTotal);
+  }, [numberOfBatches, batchSize, calculatedTotal, form]);
+
   return (
     <div className="flex flex-col h-full">
       <div
@@ -359,13 +368,6 @@ export function BottomControlsPanel({
                         control={control}
                         name="totalPayments"
                         render={({ field }) => {
-                          const numberOfBatches = form.watch('numberOfBatches') || 100;
-                          const batchSize = form.watch('batchSize') || 10;
-                          const calculatedTotal = numberOfBatches * batchSize;
-                          // Update the totalPayments value when numberOfBatches or batchSize changes
-                          React.useEffect(() => {
-                            field.onChange(calculatedTotal);
-                          }, [numberOfBatches, batchSize, calculatedTotal, field]);
                           return (
                             <FormItem>
                               <FormLabel>Total Payments (Calculated)</FormLabel>

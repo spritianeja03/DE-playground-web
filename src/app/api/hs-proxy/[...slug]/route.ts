@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const HYPERSWITCH_API_BASE_URL = 'https://sandbox.hyperswitch.io';
-
 // Define a custom RequestInit type that includes 'duplex'
 interface RequestInitWithDuplex extends RequestInit {
   duplex?: 'half';
@@ -10,11 +8,16 @@ interface RequestInitWithDuplex extends RequestInit {
 async function handler(req: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
   const { slug } = await params;
   const path = slug.join('/');
-  const targetUrl = `${HYPERSWITCH_API_BASE_URL}/${path}`;
+  const baseUrl = req.headers.get('x-base-url') || 'https://sandbox.hyperswitch.io';
+  console.log(`[HS_PROXY] Base URL header: '${req.headers.get('x-base-url')}', resolved baseUrl: '${baseUrl}'`);
+  
+  const targetUrl = `${baseUrl}/${path}`;
+  
+  console.log(`[HS_PROXY] Base URL: ${baseUrl}, Target URL: ${targetUrl}`);
 
   const headers = new Headers();
   // Forward essential headers from the client
-  const apiKey = req.headers.get('api-key');
+  const apiKey = req.headers.get('x-api-key');
   const contentType = req.headers.get('Content-Type');
   const accept = req.headers.get('Accept');
   const xProfileId = req.headers.get('x-profile-id'); // For /profile/connectors
@@ -39,6 +42,7 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ slug: s
   // Add any other headers you might need to forward or set
 
   try {
+    console.log("target url: ", targetUrl);
     const request_body = await req.text(); // Read the request body as text
     const response = await fetch(targetUrl, {
       method: req.method,
