@@ -75,6 +75,36 @@ export default function HomePage() {
 
   const { toast } = useToast();
 
+  const activateRoutingAlgorithm = useCallback(async (routingAlgoId: string) => {
+    try {
+      const response = await fetch(`/demo/app/api/hs-proxy/routing/${routingAlgoId}/activate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-base-url': baseUrl,
+          'x-api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Failed to activate routing algorithm." }));
+        console.error("[activateRoutingAlgorithm] API Error:", errorData.message || `HTTP ${response.status}`);
+        toast({ title: "Routing Activation Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
+        return false;
+      } else {
+        const responseData = await response.json();
+        console.log("[activateRoutingAlgorithm] Response Data:", responseData);
+        toast({ title: "Routing Algorithm Activated", description: "Routing algorithm activated successfully." });
+        return true;
+      }
+    } catch (error: any) {
+      console.error("[activateRoutingAlgorithm] Fetch Error:", error);
+      toast({ title: "Routing Activation Network Error", description: error.message, variant: "destructive" });
+      return false;
+    }
+  }, [baseUrl, toast]);
+
   const updateRuleConfiguration = useCallback(async (
     merchantId: string,
     profileId: string,
@@ -125,14 +155,23 @@ export default function HomePage() {
         toast({ title: "Rule Update Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
       } else {
         const responseData = await response.json();
-        // console.log("[updateRuleConfiguration] Response Data:", responseData);
+        console.log("[updateRuleConfiguration] Response Data:", responseData);
         toast({ title: "Rule Configuration Updated", description: "Success Rate Configuration updated successfully." });
+        
+        // Use the ID from the update SR config response to activate the routing algorithm
+        if (responseData && responseData.id) {
+          console.log("[updateRuleConfiguration] Using new routing algorithm ID from response:", responseData.id);
+          await activateRoutingAlgorithm(responseData.id);
+        } else {
+          console.warn("[updateRuleConfiguration] No ID found in update SR config response. Cannot activate routing algorithm.");
+          toast({ title: "Activation Warning", description: "No routing algorithm ID found in response. Activation skipped.", variant: "destructive" });
+        }
       }
     } catch (error: any) {
       console.error("[updateRuleConfiguration] Fetch Error:", error);
       toast({ title: "Rule Update Network Error", description: error.message, variant: "destructive" });
     }
-  }, [baseUrl, toast]);
+  }, [baseUrl, toast, activateRoutingAlgorithm]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -662,6 +701,8 @@ export default function HomePage() {
       .filter(mc => connectorToggleStates[mc.merchant_connector_id || mc.connector_name])
       .map(mc => mc.connector_name);
 
+    console.log(`[ProcessSinglePayment] Active connectors for payment ${paymentIndex}:`, activeConnectorLabels);
+
     if (currentControls.isSuccessBasedRoutingEnabled) {
       // Ensure all prerequisites for decideGateway are met
       if (activeConnectorLabels.length > 0 && profileId && merchantId && apiKey) {
@@ -832,6 +873,7 @@ export default function HomePage() {
           mc.connector_name === loggedConnectorName || mc.merchant_connector_id === loggedConnectorName
         );
         const connectorNameForUpdate = foundConnector ? foundConnector.connector_name : loggedConnectorName;
+        console.log(`[FR]: Updating gateway score for connector: ${connectorNameForUpdate}, success: ${isSuccess}, payment_id: ${payment_id}`);
         await updateGatewayScore(profileId, connectorNameForUpdate, isSuccess, currentControls, payment_id);
       }
     } catch (error: any) {

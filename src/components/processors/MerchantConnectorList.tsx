@@ -25,7 +25,7 @@ export function MerchantConnectorList({
     <div className="space-y-4">
       {connectors.map((connector) => {
         const key = connector.merchant_connector_id || connector.connector_name;
-        const displayName = connector.connector_label || connector.connector_name;
+        const displayName = connector.connector_name; // Only use connector_name for consistency
         return (
           <Card key={key} className="shadow-sm">
             <CardContent className="p-4 flex items-center justify-between">
@@ -34,7 +34,7 @@ export function MerchantConnectorList({
                   {displayName}
                 </Label>
                 <span className="text-xs text-muted-foreground">
-                  ID: {connector.merchant_connector_id} (Name: {connector.connector_name})
+                  ID: {connector.merchant_connector_id}
                 </span>
               </div>
             </CardContent>
