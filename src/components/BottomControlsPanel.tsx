@@ -556,7 +556,7 @@ export function BottomControlsPanel({
                     <div className="flex flex-col gap-2">
                       {(merchantConnectors || []).map(connector => {
                         const connectorId = connector.merchant_connector_id || connector.connector_name;
-                        const connectorDisplayName = connector.connector_label || connector.connector_name;
+                        const connectorDisplayName = connector.connector_name;
                         return (
                           <div key={connectorId} className="border p-2 rounded-md flex items-center justify-between">
                             <Label htmlFor={`toggle-pm-${connectorId}`} className="font-medium text-sm truncate" title={connectorDisplayName}>

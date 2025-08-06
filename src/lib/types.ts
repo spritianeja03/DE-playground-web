@@ -125,7 +125,7 @@ export type AISummaryOutput = z.infer<typeof SummarizeSimulationOutputSchema>;
 // Interface for Merchant Connector data fetched from API
 export interface MerchantConnector {
   connector_name: string; // Typically used as an identifier if no specific ID field is primary
-  connector_label: string; // User-friendly display name
+  // connector_label: string; // User-friendly display name
   merchant_connector_id: string; 
   disabled?: boolean; // Explicitly add the disabled field
   connector_type?: string; // Using string for flexibility, can be a union of known types
