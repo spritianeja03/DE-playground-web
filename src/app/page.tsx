@@ -161,6 +161,11 @@ export default function HomePage() {
         // Use the ID from the update SR config response to activate the routing algorithm
         if (responseData && responseData.id) {
           console.log("[updateRuleConfiguration] Using new routing algorithm ID from response:", responseData.id);
+          
+          // Hit volume split API before activating the rule
+          const apiKey = localStorage.getItem(LOCALSTORAGE_API_KEY) || '';
+          await setVolumeSplit(merchantId, profileId, apiKey, baseUrl);
+          
           await activateRoutingAlgorithm(responseData.id);
         } else {
           console.warn("[updateRuleConfiguration] No ID found in update SR config response. Cannot activate routing algorithm.");
