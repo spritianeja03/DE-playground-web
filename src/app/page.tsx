@@ -277,10 +277,26 @@ export default function HomePage() {
       return { selectedConnector: null, routingApproach: 'unknown', srScores: undefined };
     }
 
-
+    // Create a formatted eligible gateway list with connector_name:merchant_connector_id format
+    const formattedEligibleGateways = activeConnectorLabels.map(connectorName => {
+      const connector = merchantConnectors.find(mc => mc.connector_name === connectorName);
+      if (connector && connector.merchant_connector_id) {
+        return `${connector.connector_name}:${connector.merchant_connector_id}`;
+      }
+      // Log warning if connector not found or missing merchant_connector_id
+      console.warn(`[decideGateway] Connector '${connectorName}' not found or missing merchant_connector_id. Using fallback format.`);
+      return connectorName;
+    });
+    console.log("[decideGateway] Formatted eligible gateways:", formattedEligibleGateways);
+    console.log("[decideGateway] Available merchantConnectors:", merchantConnectors.map(mc => ({
+      connector_name: mc.connector_name,
+      merchant_connector_id: mc.merchant_connector_id
+    })));
+    // Use the formatted list for the payload
     const payload = {
       merchantId: currentProfileId,
-      eligibleGatewayList: activeConnectorLabels,
+      // eligibleGatewayList: activeConnectorLabels,
+      eligibleGatewayList: formattedEligibleGateways,
       rankingAlgorithm: "SR_BASED_ROUTING",
       eliminationEnabled: false,
       paymentInfo: {
@@ -722,12 +738,17 @@ export default function HomePage() {
         srScores = decisionResult.srScores;
 
         if (returnedConnectorLabel) {
-          const matchedConnector = merchantConnectors.find(mc => mc.connector_name === returnedConnectorLabel);
+          // Extract connector name from the formatted string (connector_name:mca_id)
+          const connectorNameFromLabel = returnedConnectorLabel.includes(':') 
+            ? returnedConnectorLabel.split(':')[0] 
+            : returnedConnectorLabel;
+          
+          const matchedConnector = merchantConnectors.find(mc => mc.connector_name === connectorNameFromLabel);
           if (matchedConnector) {
             connectorNameToUseForCardSR = matchedConnector.connector_name;
           } else {
             // SBR returned a label, but it's not in our merchantConnectors list.
-            console.warn(`[ProcessSinglePayment] SBR: Connector label '${returnedConnectorLabel}' from decideGateway not found in local merchantConnectors. Using SR of first active connector if available.`);
+            console.warn(`[ProcessSinglePayment] SBR: Connector label '${returnedConnectorLabel}' (extracted: '${connectorNameFromLabel}') from decideGateway not found in local merchantConnectors. Using SR of first active connector if available.`);
             if (activeConnectorLabels.length > 0) { // Fallback to first active if match fails
               connectorNameToUseForCardSR = activeConnectorLabels[0];
             }
@@ -795,7 +816,12 @@ export default function HomePage() {
 
     // Apply .routing object to paymentData if SBR was enabled and resulted in a specific connector selection
     if (currentControls.isSuccessBasedRoutingEnabled && returnedConnectorLabel) {
-        const matchedConnectorForRoutingObject = merchantConnectors.find(mc => mc.connector_name === returnedConnectorLabel);
+        // Extract connector name from the formatted string (connector_name:mca_id)
+        const connectorNameForRouting = returnedConnectorLabel.includes(':') 
+            ? returnedConnectorLabel.split(':')[0] 
+            : returnedConnectorLabel;
+            
+        const matchedConnectorForRoutingObject = merchantConnectors.find(mc => mc.connector_name === connectorNameForRouting);
         if (matchedConnectorForRoutingObject) { // Ensure connector is valid before adding routing object
              (paymentData as any).routing = {
                 type: "single",
@@ -804,6 +830,9 @@ export default function HomePage() {
                     merchant_connector_id: matchedConnectorForRoutingObject.merchant_connector_id
                 }
             };
+            console.log(`[ProcessSinglePayment] Added routing block for connector: ${matchedConnectorForRoutingObject.connector_name} (${matchedConnectorForRoutingObject.merchant_connector_id})`);
+        } else {
+            console.warn(`[ProcessSinglePayment] Could not find connector '${connectorNameForRouting}' (from '${returnedConnectorLabel}') for routing block`);
         }
     }
 
@@ -846,16 +875,53 @@ export default function HomePage() {
 
       // Create log entry
       let payment_id = responseData.payment_id;
-      let loggedConnectorName = connectorHeader || responseData.connector_name || responseData.merchant_connector_id || 'unknown';
+      let rawConnectorName = connectorHeader || responseData.connector_name || responseData.merchant_connector_id || 'unknown';
+      let loggedConnectorName = rawConnectorName; // Keep original for backward compatibility
+      
+      // Extract just the connector name for logging (remove mca_id if present)
+      let displayConnectorName = rawConnectorName;
+      
+      // If rawConnectorName is an mca_id, try to find the actual connector name
+      if (rawConnectorName !== 'unknown') {
+        // First, check if it's a formatted string with ':'
+        if (rawConnectorName.includes(':')) {
+          displayConnectorName = rawConnectorName.split(':')[0];
+          loggedConnectorName = displayConnectorName; // Update loggedConnectorName to clean name
+        } else {
+          // If it's just an mca_id, try to find the connector name from merchantConnectors
+          const foundConnector = merchantConnectors.find(mc => 
+            mc.merchant_connector_id === rawConnectorName || mc.connector_name === rawConnectorName
+          );
+          if (foundConnector) {
+            displayConnectorName = foundConnector.connector_name;
+            loggedConnectorName = foundConnector.connector_name; // Update loggedConnectorName to clean name
+          } else {
+            // If we can't find it, keep the original value
+            displayConnectorName = rawConnectorName;
+            loggedConnectorName = rawConnectorName;
+          }
+        }
+      }
+      
+      // Clean up SR scores to show only connector names (not formatted strings)
+      let cleanedSrScores: Record<string, number> | undefined = undefined;
+      if (srScores) {
+        cleanedSrScores = {};
+        Object.entries(srScores).forEach(([key, value]) => {
+          const cleanKey = key.includes(':') ? key.split(':')[0] : key;
+          cleanedSrScores![cleanKey] = value;
+        });
+      }
+      
       if (paymentStatusHeader || responseData.status) {
         transactionCounterRef.current += 1;
         logEntry = {
           transactionNumber: transactionCounterRef.current,
           status: paymentStatusHeader || responseData.status,
-          connector: loggedConnectorName,
+          connector: displayConnectorName,
           timestamp: Date.now(),
           routingApproach,
-          sr_scores: srScores,
+          sr_scores: cleanedSrScores,
         };
       }
 
@@ -878,8 +944,8 @@ export default function HomePage() {
           mc.connector_name === loggedConnectorName || mc.merchant_connector_id === loggedConnectorName
         );
         const connectorNameForUpdate = foundConnector ? foundConnector.connector_name : loggedConnectorName;
-        console.log(`[FR]: Updating gateway score for connector: ${connectorNameForUpdate}, success: ${isSuccess}, payment_id: ${payment_id}`);
-        await updateGatewayScore(profileId, connectorNameForUpdate, isSuccess, currentControls, payment_id);
+        // console.log(`[FR]: Updating gateway score for connector: ${connectorNameForUpdate}, success: ${isSuccess}, payment_id: ${payment_id}`);
+        // await updateGatewayScore(profileId, connectorNameForUpdate, isSuccess, currentControls, payment_id);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
