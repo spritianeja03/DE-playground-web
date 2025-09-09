@@ -276,7 +276,8 @@ export default function HomePage() {
       console.warn("[decideGateway] Missing required parameters (controls, labels, or merchantId).");
       return { selectedConnector: null, routingApproach: 'unknown', srScores: undefined };
     }
-
+    console.log("Active connector labels:", activeConnectorLabels);
+    console.log("Merchant connectors:", merchantConnectors);
     // Create a formatted eligible gateway list with connector_name:merchant_connector_id format
     const formattedEligibleGateways = activeConnectorLabels.map(connectorName => {
       const connector = merchantConnectors.find(mc => mc.connector_name === connectorName);
@@ -488,9 +489,39 @@ export default function HomePage() {
         const errorData = await response.json().catch(() => ({ message: "Failed to fetch connectors, unknown error." }));
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
-      const connectorsData: MerchantConnector[] = await response.json();
+      const responseData = await response.json();
+      console.log("Connectors API response:", responseData);
 
-      setMerchantConnectors(connectorsData || []);
+      // Handle different possible response structures
+      let connectorsData: MerchantConnector[] = [];
+      
+      if (Array.isArray(responseData)) {
+        connectorsData = responseData;
+      } else if (responseData.data && Array.isArray(responseData.data)) {
+        connectorsData = responseData.data;
+      } else if (responseData.connectors && Array.isArray(responseData.connectors)) {
+        connectorsData = responseData.connectors;
+      } else if (responseData.results && Array.isArray(responseData.results)) {
+        connectorsData = responseData.results;
+      } else {
+        console.warn("Unexpected connectors API response structure:", responseData);
+        connectorsData = [];
+      }
+
+      console.log("Parsed connectors count:", connectorsData.length);
+      console.log("Parsed connectors data:", connectorsData);
+
+      // Validate that each connector has required fields
+      const validConnectors = connectorsData.filter(connector => 
+        connector && 
+        (connector.connector_name || connector.merchant_connector_id)
+      );
+
+      if (validConnectors.length !== connectorsData.length) {
+        console.warn(`Filtered out ${connectorsData.length - validConnectors.length} invalid connectors`);
+      }
+
+      setMerchantConnectors(validConnectors);
 
       const initialToggleStates: Record<string, boolean> = {};
       const initialProcessorWiseSuccessRates: ControlsState['processorWiseSuccessRates'] = {};
