@@ -103,7 +103,7 @@ export default function HomePage() {
       toast({ title: "Routing Activation Network Error", description: error.message, variant: "destructive" });
       return false;
     }
-  }, [baseUrl, toast]);
+  }, [baseUrl, toast, merchantConnectors, connectorToggleStates]);
 
   const updateRuleConfiguration = useCallback(async (
     merchantId: string,
@@ -278,16 +278,26 @@ export default function HomePage() {
     }
     console.log("Active connector labels:", activeConnectorLabels);
     console.log("Merchant connectors:", merchantConnectors);
-    // Create a formatted eligible gateway list with connector_name:merchant_connector_id format
-    const formattedEligibleGateways = activeConnectorLabels.map(connectorName => {
-      const connector = merchantConnectors.find(mc => mc.connector_name === connectorName);
-      if (connector && connector.merchant_connector_id) {
-        return `${connector.connector_name}:${connector.merchant_connector_id}`;
-      }
-      // Log warning if connector not found or missing merchant_connector_id
-      console.warn(`[decideGateway] Connector '${connectorName}' not found or missing merchant_connector_id. Using fallback format.`);
-      return connectorName;
-    });
+    console.log("Merchant connectors length:", merchantConnectors.length);
+    console.log("Connector toggle states:", connectorToggleStates);
+    
+    // Create a formatted eligible gateway list directly from merchantConnectors with connector_name:merchant_connector_id format
+    const formattedEligibleGateways = merchantConnectors
+      .filter(mc => {
+        // Only include connectors that are active (enabled in toggle states) and have required fields
+        const connectorKey = mc.merchant_connector_id || mc.connector_name;
+        const isActive = connectorToggleStates[connectorKey];
+        const hasRequiredFields = mc.connector_name && mc.merchant_connector_id;
+        
+        console.log(`[decideGateway] Checking connector: ${mc.connector_name} (${mc.merchant_connector_id}), key: ${connectorKey}, isActive: ${isActive}, hasRequiredFields: ${hasRequiredFields}`);
+        
+        if (!hasRequiredFields) {
+          console.warn(`[decideGateway] Connector missing required fields:`, mc);
+        }
+        
+        return isActive && hasRequiredFields;
+      })
+      .map(mc => `${mc.connector_name}:${mc.merchant_connector_id}`);
     console.log("[decideGateway] Formatted eligible gateways:", formattedEligibleGateways);
     console.log("[decideGateway] Available merchantConnectors:", merchantConnectors.map(mc => ({
       connector_name: mc.connector_name,
@@ -388,7 +398,7 @@ export default function HomePage() {
       toast({ title: "Decide Gateway Network Error", description: error.message, variant: "destructive" });
       return { selectedConnector: null, routingApproach: 'unknown', srScores: undefined };
     }
-  }, [baseUrl, toast]);
+  }, [baseUrl, toast, merchantConnectors, connectorToggleStates]);
 
 
   const updateGatewayScore = useCallback(async (
@@ -470,6 +480,10 @@ export default function HomePage() {
 
   const fetchMerchantConnectors = async (currentMerchantId: string, currentApiKey: string, currentBaseUrl: string): Promise<MerchantConnector[]> => {
     console.log("fetchMerchantConnectors called with Merchant ID:", currentMerchantId);
+    console.log("fetchMerchantConnectors called with Profile ID:", profileId);
+    console.log("fetchMerchantConnectors called with API Key:", currentApiKey ? "***provided***" : "missing");
+    console.log("fetchMerchantConnectors called with Base URL:", currentBaseUrl);
+    
     if (!currentMerchantId || !currentApiKey) {
       toast({ title: "Error", description: "Merchant ID and API Key are required to fetch connectors.", variant: "destructive" });
       return [];
@@ -481,12 +495,21 @@ export default function HomePage() {
         setIsLoadingMerchantConnectors(false);
         return [];
       }
-      const response = await fetch(`${currentBaseUrl}/account/${currentMerchantId}/profile/connectors`, {
+      
+      const fetchUrl = `${currentBaseUrl}/account/${currentMerchantId}/profile/connectors`;
+      console.log("Fetching connectors from URL:", fetchUrl);
+      
+      const response = await fetch(fetchUrl, {
         method: 'GET',
         headers: { 'api-key': currentApiKey, 'x-profile-id': profileId },
       });
+      
+      console.log("Connectors API response status:", response.status);
+      console.log("Connectors API response headers:", Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: "Failed to fetch connectors, unknown error." }));
+        console.error("Connectors API error:", errorData);
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
       const responseData = await response.json();
@@ -496,15 +519,20 @@ export default function HomePage() {
       let connectorsData: MerchantConnector[] = [];
       
       if (Array.isArray(responseData)) {
+        console.log("Response is direct array");
         connectorsData = responseData;
       } else if (responseData.data && Array.isArray(responseData.data)) {
+        console.log("Response has data array");
         connectorsData = responseData.data;
       } else if (responseData.connectors && Array.isArray(responseData.connectors)) {
+        console.log("Response has connectors array");
         connectorsData = responseData.connectors;
       } else if (responseData.results && Array.isArray(responseData.results)) {
+        console.log("Response has results array");
         connectorsData = responseData.results;
       } else {
         console.warn("Unexpected connectors API response structure:", responseData);
+        console.warn("Response keys:", Object.keys(responseData));
         connectorsData = [];
       }
 
@@ -514,13 +542,22 @@ export default function HomePage() {
       // Validate that each connector has required fields
       const validConnectors = connectorsData.filter(connector => 
         connector && 
-        (connector.connector_name || connector.merchant_connector_id)
+        connector.connector_name && 
+        connector.merchant_connector_id
       );
+
+      console.log("Valid connectors count:", validConnectors.length);
+      console.log("Valid connectors:", validConnectors.map(c => ({
+        connector_name: c.connector_name,
+        merchant_connector_id: c.merchant_connector_id,
+        disabled: c.disabled
+      })));
 
       if (validConnectors.length !== connectorsData.length) {
         console.warn(`Filtered out ${connectorsData.length - validConnectors.length} invalid connectors`);
       }
 
+      console.log("Setting merchantConnectors state with:", validConnectors);
       setMerchantConnectors(validConnectors);
 
       const initialToggleStates: Record<string, boolean> = {};
@@ -540,6 +577,8 @@ export default function HomePage() {
           }, {} as Record<PaymentMethod, boolean>);
         }
       });
+      
+      console.log("Initial toggle states:", initialToggleStates);
       setConnectorToggleStates(initialToggleStates);
 
       setCurrentControls(prev => {
