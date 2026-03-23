@@ -1,3 +1,5 @@
+// This polyfill must be loaded first to fix Node.js v25 experimental localStorage issue
+import '@/lib/localStorage-polyfill';
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';

@@ -28,6 +28,20 @@ const LOCALSTORAGE_MERCHANT_ID = 'hyperswitch_merchantId';
 const LOCALSTORAGE_ROUTING_ID = 'hyperswitch_routingId';
 const LOCALSTORAGE_BASE_URL = 'hyperswitch_baseUrl';
 
+// SSR-safe localStorage helper
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return null;
+    return localStorage.getItem(key);
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof window === 'undefined') return;
+    if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return;
+    localStorage.setItem(key, value);
+  },
+};
+
 // Type for the outcome of a single payment processing attempt
 interface SinglePaymentOutcome {
   isSuccess: boolean;
@@ -82,7 +96,7 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
           'x-base-url': baseUrl,
-          'x-api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+          'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
         },
         body: JSON.stringify({}),
       });
@@ -144,7 +158,7 @@ export default function HomePage() {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'x-base-url': baseUrl,
-          'x-api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+          'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
         },
         body: JSON.stringify(payload),
       });
@@ -163,7 +177,7 @@ export default function HomePage() {
           console.log("[updateRuleConfiguration] Using new routing algorithm ID from response:", responseData.id);
           
           // Hit volume split API before activating the rule
-          const apiKey = localStorage.getItem(LOCALSTORAGE_API_KEY) || '';
+          const apiKey = safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '';
           await setVolumeSplit(merchantId, profileId, apiKey, baseUrl);
           
           await activateRoutingAlgorithm(responseData.id);
@@ -182,8 +196,6 @@ export default function HomePage() {
 
   const [activeSection, setActiveSection] = useState('general');
 
-  const prevControlsRef = useRef<FormValues | null>(null);
-
   const parentTab = 'intelligent-routing';
   // Content tab: 'stats' or 'analytics'
   const [contentTab, setContentTab] = useState<'stats' | 'analytics'>('stats');
@@ -191,10 +203,10 @@ export default function HomePage() {
   useEffect(() => {
     // Load credentials from localStorage on initial mount
     if (typeof window !== 'undefined') {
-      const storedApiKey = localStorage.getItem(LOCALSTORAGE_API_KEY);
-      const storedProfileId = localStorage.getItem(LOCALSTORAGE_PROFILE_ID);
-      const storedMerchantId = localStorage.getItem(LOCALSTORAGE_MERCHANT_ID);
-      const storedBaseUrl = localStorage.getItem(LOCALSTORAGE_BASE_URL);
+      const storedApiKey = safeLocalStorage.getItem(LOCALSTORAGE_API_KEY);
+      const storedProfileId = safeLocalStorage.getItem(LOCALSTORAGE_PROFILE_ID);
+      const storedMerchantId = safeLocalStorage.getItem(LOCALSTORAGE_MERCHANT_ID);
+      const storedBaseUrl = safeLocalStorage.getItem(LOCALSTORAGE_BASE_URL);
       let allCredentialsFound = true; // Initialize here
 
       if (storedApiKey) {
@@ -232,39 +244,21 @@ export default function HomePage() {
     }
   }, []); // Run once on mount
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      if (currentControls && merchantId && prevControlsRef.current) {
-        const prevControls = prevControlsRef.current;
-        const currentExplorationPercent = currentControls.explorationPercent;
-        const currentBucketSize = currentControls.bucketSize;
-
-        const prevExplorationPercent = prevControls?.explorationPercent;
-        const prevBucketSize = prevControls?.bucketSize;
-
-        // Only call updateRuleConfiguration if explorationPercent or bucketSize have actually changed
-        if (
-          currentExplorationPercent !== undefined &&
-          currentBucketSize !== undefined &&
-          (currentExplorationPercent !== prevExplorationPercent || currentBucketSize !== prevBucketSize)
-        ) {
-          console.log("Exploration percentage or bucket size changed. Updating rule configuration.");
-            // Get the routing ID from localStorage (set after SR toggle)
-            const routingId = localStorage.getItem(LOCALSTORAGE_ROUTING_ID);
-            if (routingId) {
-            updateRuleConfiguration(merchantId, profileId, currentExplorationPercent, currentBucketSize, routingId);
-            } else {
-            console.warn("No routing ID found in localStorage. Skipping rule configuration update.");
-            }
-        }
-      }
-      prevControlsRef.current = currentControls;
-    }, 900); // Debounce for 900ms
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [currentControls, profileId, updateRuleConfiguration]);
+  const handleRoutingParamsChange = useCallback((explorationPercent: number, bucketSize: number) => {
+    if (!merchantId || !profileId) {
+      console.warn("[handleRoutingParamsChange] Missing merchantId or profileId. Cannot update routing params.");
+      toast({ title: "Credentials Missing", description: "Enter API credentials first.", variant: "destructive" });
+      return;
+    }
+    const routingId = safeLocalStorage.getItem(LOCALSTORAGE_ROUTING_ID);
+    if (!routingId) {
+      console.warn("[handleRoutingParamsChange] No routing ID in localStorage. Enable Success Based Routing first.");
+      toast({ title: "Routing ID Missing", description: "Enable Success Based Routing first to generate a routing ID.", variant: "destructive" });
+      return;
+    }
+    console.log("[handleRoutingParamsChange] Updating routing params:", { explorationPercent, bucketSize, routingId });
+    updateRuleConfiguration(merchantId, profileId, explorationPercent, bucketSize, routingId);
+  }, [merchantId, profileId, updateRuleConfiguration, toast]);
 
   const decideGateway = useCallback(async (
     currentControls: FormValues,
@@ -339,8 +333,8 @@ export default function HomePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
-          'x-base-url': localStorage.getItem(LOCALSTORAGE_BASE_URL) || 'https://sandbox.hyperswitch.io',
+          'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+          'x-base-url': safeLocalStorage.getItem(LOCALSTORAGE_BASE_URL) || 'https://sandbox.hyperswitch.io',
           // 'x-feature': 'decision-engine'
         },
         body: JSON.stringify(payload),
@@ -435,8 +429,8 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
           // 'x-feature': 'decision-engine'
-          'x-api-key': localStorage.getItem(LOCALSTORAGE_API_KEY) || '',
-          'x-base-url': localStorage.getItem(LOCALSTORAGE_BASE_URL) || 'https://sandbox.hyperswitch.io'
+          'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+          'x-base-url': safeLocalStorage.getItem(LOCALSTORAGE_BASE_URL) || 'https://sandbox.hyperswitch.io'
         },
         body: JSON.stringify(payload),
       });
@@ -715,12 +709,12 @@ export default function HomePage() {
     const toggleResponse = await toggleSrRule(merchantId, profileId, apiKey, baseUrl);
     
     if (toggleResponse && toggleResponse.id) {
-      const storedRoutingId = localStorage.getItem(LOCALSTORAGE_ROUTING_ID);
+      const storedRoutingId = safeLocalStorage.getItem(LOCALSTORAGE_ROUTING_ID);
       console.log("Stored Routing ID:", storedRoutingId);
       console.log("New Routing ID from API:", toggleResponse.id);
       if (storedRoutingId !== toggleResponse.id) {
         console.log("Routing ID is new. Updating local storage and calling setVolumeSplit.");
-        localStorage.setItem(LOCALSTORAGE_ROUTING_ID, toggleResponse.id);
+        safeLocalStorage.setItem(LOCALSTORAGE_ROUTING_ID, toggleResponse.id);
         await setVolumeSplit(merchantId, profileId, apiKey, baseUrl);
       } else {
         console.log("Routing ID is the same. Not calling setVolumeSplit.");
@@ -729,10 +723,10 @@ export default function HomePage() {
       console.log("No id in toggle response.");
     }
     
-    localStorage.setItem(LOCALSTORAGE_API_KEY, apiKey);
-    localStorage.setItem(LOCALSTORAGE_PROFILE_ID, profileId);
-    localStorage.setItem(LOCALSTORAGE_MERCHANT_ID, merchantId);
-    localStorage.setItem(LOCALSTORAGE_BASE_URL, baseUrl);
+    safeLocalStorage.setItem(LOCALSTORAGE_API_KEY, apiKey);
+    safeLocalStorage.setItem(LOCALSTORAGE_PROFILE_ID, profileId);
+    safeLocalStorage.setItem(LOCALSTORAGE_MERCHANT_ID, merchantId);
+    safeLocalStorage.setItem(LOCALSTORAGE_BASE_URL, baseUrl);
   };
 
   const resetSimulationState = () => {
@@ -1013,9 +1007,11 @@ export default function HomePage() {
         const foundConnector = merchantConnectors.find(mc =>
           mc.connector_name === loggedConnectorName || mc.merchant_connector_id === loggedConnectorName
         );
-        const connectorNameForUpdate = foundConnector ? foundConnector.connector_name : loggedConnectorName;
-        // console.log(`[FR]: Updating gateway score for connector: ${connectorNameForUpdate}, success: ${isSuccess}, payment_id: ${payment_id}`);
-        // await updateGatewayScore(profileId, connectorNameForUpdate, isSuccess, currentControls, payment_id);
+        const connectorNameForUpdate = foundConnector
+          ? `${foundConnector.connector_name}:${foundConnector.merchant_connector_id}`
+          : loggedConnectorName;
+        console.log(`[FR]: Updating gateway score for connector: ${connectorNameForUpdate}, success: ${isSuccess}, payment_id: ${payment_id}`);
+        await updateGatewayScore(profileId, connectorNameForUpdate, isSuccess, currentControls, payment_id);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
@@ -1065,7 +1061,7 @@ export default function HomePage() {
       cardDetailsToUse = {
         card_number: connectorCards?.successCard?.cardNumber || "4242424242424242",
         card_exp_month: connectorCards?.successCard?.expMonth || "10",
-        card_exp_year: connectorCards?.successCard?.expYear || "25",
+        card_exp_year: connectorCards?.successCard?.expYear || "27",
         card_holder_name: connectorCards?.successCard?.holderName || "Joseph Doe",
         card_cvc: connectorCards?.successCard?.cvc || "123",
       };
@@ -1450,6 +1446,7 @@ export default function HomePage() {
                 <BottomControlsPanel
                   initialValues={currentControls ?? undefined}
                   onFormChange={handleControlsChange}
+                  onRoutingParamsChange={handleRoutingParamsChange}
                   merchantConnectors={merchantConnectors}
                   connectorToggleStates={connectorToggleStates}
                   onConnectorToggleChange={handleConnectorToggleChange}

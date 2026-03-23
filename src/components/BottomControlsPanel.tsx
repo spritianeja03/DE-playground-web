@@ -39,7 +39,7 @@ interface GlobalCardDetailsFromStorage {
 
 const loadGlobalCardDetailsFromStorage = (): GlobalCardDetailsFromStorage => {
   const loaded: GlobalCardDetailsFromStorage = {};
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && typeof localStorage?.getItem === 'function') {
     try {
       const storedSuccess = localStorage.getItem(LOCALSTORAGE_SUCCESS_CARD_KEY);
       if (storedSuccess) {
@@ -145,6 +145,7 @@ export type FormValues = Omit<z.infer<typeof formSchema>, 'structuredRule' | 'ov
 
 interface BottomControlsPanelProps {
   onFormChange: (data: FormValues) => void;
+  onRoutingParamsChange?: (explorationPercent: number, bucketSize: number) => void;
   initialValues?: Partial<FormValues>;
   merchantConnectors: MerchantConnector[];
   connectorToggleStates: Record<string, boolean>; 
@@ -166,7 +167,8 @@ function formatCardNumber(value: string) {
 }
 
 export function BottomControlsPanel({ 
-  onFormChange, 
+  onFormChange,
+  onRoutingParamsChange,
   initialValues,
   merchantConnectors,
   connectorToggleStates, 
@@ -176,6 +178,20 @@ export function BottomControlsPanel({
   parentTab = 'intelligent-routing',
 }: BottomControlsPanelProps & { activeTab: string; parentTab: 'intelligent-routing' }) {
   const { toast } = useToast();
+
+  // Debounced callback for routing param changes (exploration %, bucket size)
+  const routingParamsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerRoutingParamsUpdate = useCallback((explorationPercent: number, bucketSize: number) => {
+    if (routingParamsDebounceRef.current) {
+      clearTimeout(routingParamsDebounceRef.current);
+    }
+    routingParamsDebounceRef.current = setTimeout(() => {
+      if (onRoutingParamsChange) {
+        onRoutingParamsChange(explorationPercent, bucketSize);
+      }
+    }, 800);
+  }, [onRoutingParamsChange]);
+
   const dynamicDefaults = useMemo(() => {
     const matrix: ProcessorPaymentMethodMatrix = {};
     const incidents: ProcessorIncidentStatus = {};
@@ -202,7 +218,7 @@ export function BottomControlsPanel({
         successCard: {
           cardNumber: globalStoredCards.successCardNumber || "4242424242424242",
           expMonth: globalStoredCards.successCardExpMonth || "10",
-          expYear: globalStoredCards.successCardExpYear || "25",
+          expYear: globalStoredCards.successCardExpYear || "27",
           holderName: globalStoredCards.successCardHolderName || "Joseph Doe",
           cvc: globalStoredCards.successCardCvc || "123",
         },
@@ -616,10 +632,13 @@ export function BottomControlsPanel({
                               <FormLabel className="text-xs">Exploration Percent: {field.value}%</FormLabel>
                               <FormControl>
                                 <Slider
-                                  value={[field.value || 20]} 
-                                  min={0} max={100} step={1}
-                                  onValueChange={(value: number[]) => { field.onChange(value[0]); }}
-                                />
+                                   value={[field.value || 20]} 
+                                   min={0} max={100} step={1}
+                                   onValueChange={(value: number[]) => {
+                                     field.onChange(value[0]);
+                                     triggerRoutingParamsUpdate(value[0], form.getValues('bucketSize') ?? 30);
+                                   }}
+                                 />
                               </FormControl>
                               <FormDescription className="text-xs">Percentage of traffic for exploring new routes.</FormDescription>
                               <FormMessage />
@@ -635,7 +654,11 @@ export function BottomControlsPanel({
                               <FormItem>
                                 <FormLabel className="text-xs">Bucket Size (bucketSize)</FormLabel>
                                 <FormControl>
-                                  <Input type="number" placeholder="e.g., 30" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} min="0" className="bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border text-gray-900 dark:text-white rounded-md px-3 py-2" />
+                                   <Input type="number" placeholder="e.g., 30" {...field} onChange={e => {
+                                       const val = parseInt(e.target.value) || 0;
+                                       field.onChange(val);
+                                       triggerRoutingParamsUpdate(form.getValues('explorationPercent') ?? 20, val);
+                                     }} min="0" className="bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border text-gray-900 dark:text-white rounded-md px-3 py-2" />
                                 </FormControl>
                                 <FormDescription className="text-xs">Bucket size for SR calculation (for /fetch).</FormDescription>
                                 <FormMessage />
