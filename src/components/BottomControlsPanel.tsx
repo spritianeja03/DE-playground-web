@@ -146,13 +146,14 @@ export type FormValues = Omit<z.infer<typeof formSchema>, 'structuredRule' | 'ov
 interface BottomControlsPanelProps {
   onFormChange: (data: FormValues) => void;
   onRoutingParamsChange?: (explorationPercent: number, bucketSize: number) => void;
+  onCreateConfig?: (explorationPercent: number, bucketSize: number) => void;
   initialValues?: Partial<FormValues>;
   merchantConnectors: MerchantConnector[];
-  connectorToggleStates: Record<string, boolean>; 
-  onConnectorToggleChange: (connectorId: string, newState: boolean) => void; 
-  apiKey: string; 
-  profileId: string; 
-  merchantId: string; 
+  connectorToggleStates: Record<string, boolean>;
+  onConnectorToggleChange: (connectorId: string, newState: boolean) => void;
+  apiKey: string;
+  profileId: string;
+  merchantId: string;
   collapsed?: boolean;
   onToggleCollapse: () => void;
   activeTab: string;
@@ -166,13 +167,14 @@ function formatCardNumber(value: string) {
   return digits.replace(/(.{4})/g, '$1 ').trim();
 }
 
-export function BottomControlsPanel({ 
+export function BottomControlsPanel({
   onFormChange,
   onRoutingParamsChange,
+  onCreateConfig,
   initialValues,
   merchantConnectors,
-  connectorToggleStates, 
-  onConnectorToggleChange, 
+  connectorToggleStates,
+  onConnectorToggleChange,
   collapsed = false,
   activeTab,
   parentTab = 'intelligent-routing',
@@ -666,6 +668,17 @@ export function BottomControlsPanel({
                             )}
                           />
                         </div>
+                        <Button
+                          type="button"
+                          className="mt-4 w-full"
+                          onClick={() => {
+                            const explorationPercent = form.getValues('explorationPercent') ?? 20;
+                            const bucketSize = form.getValues('bucketSize') ?? 30;
+                            if (onCreateConfig) onCreateConfig(explorationPercent, bucketSize);
+                          }}
+                        >
+                          Create Config
+                        </Button>
                       </div>
                     )}
                   </div>

@@ -27,6 +27,7 @@ const LOCALSTORAGE_PROFILE_ID = 'hyperswitch_profileId';
 const LOCALSTORAGE_MERCHANT_ID = 'hyperswitch_merchantId';
 const LOCALSTORAGE_ROUTING_ID = 'hyperswitch_routingId';
 const LOCALSTORAGE_BASE_URL = 'hyperswitch_baseUrl';
+const LOCALSTORAGE_DE_BASE_URL = 'hyperswitch_deBaseUrl';
 
 // SSR-safe localStorage helper
 const safeLocalStorage = {
@@ -64,6 +65,8 @@ export default function HomePage() {
   const [profileId, setProfileId] = useState<string>('');
   const [merchantId, setMerchantId] = useState<string>('');
   const [baseUrl, setBaseUrl] = useState<string>('https://sandbox.hyperswitch.io');
+  const [deBaseUrl, setDeBaseUrl] = useState<string>('');
+  const [ruleCreated, setRuleCreated] = useState<boolean>(false);
 
   const [merchantConnectors, setMerchantConnectors] = useState<MerchantConnector[]>([]);
   const [connectorToggleStates, setConnectorToggleStates] = useState<Record<string, boolean>>({});
@@ -89,108 +92,157 @@ export default function HomePage() {
 
   const { toast } = useToast();
 
-  const activateRoutingAlgorithm = useCallback(async (routingAlgoId: string) => {
+  // const activateRoutingAlgorithm = useCallback(async (routingAlgoId: string) => {
+  //   try {
+  //     const response = await fetch(`/demo/app/api/hs-proxy/routing/${routingAlgoId}/activate`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'x-base-url': baseUrl,
+  //         'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+  //       },
+  //       body: JSON.stringify({}),
+  //     });
+  //     if (!response.ok) {
+  //       const errorData = await response.json().catch(() => ({ message: "Failed to activate routing algorithm." }));
+  //       console.error("[activateRoutingAlgorithm] API Error:", errorData.message || `HTTP ${response.status}`);
+  //       toast({ title: "Routing Activation Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
+  //       return false;
+  //     } else {
+  //       const responseData = await response.json();
+  //       console.log("[activateRoutingAlgorithm] Response Data:", responseData);
+  //       toast({ title: "Routing Algorithm Activated", description: "Routing algorithm activated successfully." });
+  //       return true;
+  //     }
+  //   } catch (error: any) {
+  //     console.error("[activateRoutingAlgorithm] Fetch Error:", error);
+  //     toast({ title: "Routing Activation Network Error", description: error.message, variant: "destructive" });
+  //     return false;
+  //   }
+  // }, [baseUrl, toast, merchantConnectors, connectorToggleStates]);
+
+  // const updateRuleConfiguration = useCallback(async (...) => { ... });
+  // Replaced by DE-direct functions below.
+
+  const createMerchantAccount = useCallback(async (currentProfileId: string, currentDeBaseUrl: string) => {
+    if (!currentProfileId || !currentDeBaseUrl) {
+      console.warn("[createMerchantAccount] Missing profileId or deBaseUrl.");
+      return false;
+    }
     try {
-      const response = await fetch(`/demo/app/api/hs-proxy/routing/${routingAlgoId}/activate`, {
+      const response = await fetch(`/demo/app/api/hs-proxy/merchant-account/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-base-url': baseUrl,
+          'x-base-url': currentDeBaseUrl,
           'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ merchant_id: currentProfileId }),
       });
-
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Failed to activate routing algorithm." }));
-        console.error("[activateRoutingAlgorithm] API Error:", errorData.message || `HTTP ${response.status}`);
-        toast({ title: "Routing Activation Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
+        const errorData = await response.json().catch(() => ({ message: "Failed to create merchant account." }));
+        console.error("[createMerchantAccount] API Error:", errorData.message || `HTTP ${response.status}`);
+        toast({ title: "Merchant Account Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
         return false;
-      } else {
-        const responseData = await response.json();
-        console.log("[activateRoutingAlgorithm] Response Data:", responseData);
-        toast({ title: "Routing Algorithm Activated", description: "Routing algorithm activated successfully." });
-        return true;
       }
+      const responseData = await response.json();
+      console.log("[createMerchantAccount] Response:", responseData);
+      toast({ title: "Merchant Account Created", description: "DE merchant account created successfully." });
+      return true;
     } catch (error: any) {
-      console.error("[activateRoutingAlgorithm] Fetch Error:", error);
-      toast({ title: "Routing Activation Network Error", description: error.message, variant: "destructive" });
+      console.error("[createMerchantAccount] Fetch Error:", error);
+      toast({ title: "Merchant Account Network Error", description: error.message, variant: "destructive" });
       return false;
     }
-  }, [baseUrl, toast, merchantConnectors, connectorToggleStates]);
+  }, [toast]);
 
-  const updateRuleConfiguration = useCallback(async (
-    merchantId: string,
-    profileId: string,
+  const buildRoutingConfigPayload = (currentMerchantId: string, explorationPercent: number, bucketSize: number) => ({
+    merchant_id: currentMerchantId,
+    config: {
+      type: "successRate",
+      data: {
+        defaultLatencyThreshold: 90,
+        defaultSuccessRate: 0.5,
+        defaultBucketSize: bucketSize,
+        defaultHedgingPercent: explorationPercent,
+        subLevelInputConfig: [],
+      },
+    },
+  });
+
+  const createSuccessBasedRoutingConfig = useCallback(async (
+    currentMerchantId: string,
     explorationPercent: number,
     bucketSize: number,
-    toggle_routing_id: string
+    currentDeBaseUrl: string
   ) => {
-    if (!profileId) {
-      console.warn("[updateRuleConfiguration] Missing profileId.");
-      return;
+    if (!currentMerchantId || !currentDeBaseUrl) {
+      console.warn("[createSuccessBasedRoutingConfig] Missing merchantId or deBaseUrl.");
+      toast({ title: "Config Error", description: "Merchant ID and Decision Engine URL are required.", variant: "destructive" });
+      return false;
     }
-
-    const payload = {
-      // merchant_id: profileId,
-      decision_engine_configs: {
-        // type: "successRate",
-        // data: {
-          defaultLatencyThreshold: 90,
-          defaultSuccessRate: 100,
-          defaultBucketSize: 200,
-          defaultHedgingPercent: 5,
-          subLevelInputConfig: [
-            {
-              paymentMethod: "card",
-              bucketSize: bucketSize,
-              hedgingPercent: explorationPercent 
-            }
-          ]
-        // }
-      }
-    };
-
     try {
-      const response = await fetch(`/demo/app/api/hs-proxy/account/${merchantId}/business_profile/${profileId}/dynamic_routing/success_based/config/${toggle_routing_id}`, {
-        method: 'PATCH',
+      const response = await fetch(`/demo/app/api/hs-proxy/rule/create`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-base-url': baseUrl,
+          'x-base-url': currentDeBaseUrl,
           'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildRoutingConfigPayload(currentMerchantId, explorationPercent, bucketSize)),
       });
-
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Failed to update rule configuration." }));
-        console.error("[updateRuleConfiguration] API Error:", errorData.message || `HTTP ${response.status}`);
-        toast({ title: "Rule Update Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
+        const errorData = await response.json().catch(() => ({ message: "Failed to create routing config." }));
+        console.error("[createSuccessBasedRoutingConfig] API Error:", errorData.message || `HTTP ${response.status}`);
+        toast({ title: "Create Config Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
+        return false;
+      }
+      const responseData = await response.json();
+      console.log("[createSuccessBasedRoutingConfig] Response:", responseData);
+      toast({ title: "Config Created", description: "Success-based routing config created." });
+      setRuleCreated(true);
+      return true;
+    } catch (error: any) {
+      console.error("[createSuccessBasedRoutingConfig] Fetch Error:", error);
+      toast({ title: "Create Config Network Error", description: error.message, variant: "destructive" });
+      return false;
+    }
+  }, [toast]);
+
+  const updateSuccessBasedRoutingConfig = useCallback(async (
+    currentMerchantId: string,
+    explorationPercent: number,
+    bucketSize: number,
+    currentDeBaseUrl: string
+  ) => {
+    if (!currentMerchantId || !currentDeBaseUrl) {
+      console.warn("[updateSuccessBasedRoutingConfig] Missing merchantId or deBaseUrl.");
+      return;
+    }
+    try {
+      const response = await fetch(`/demo/app/api/hs-proxy/rule/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-base-url': currentDeBaseUrl,
+          'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
+        },
+        body: JSON.stringify(buildRoutingConfigPayload(currentMerchantId, explorationPercent, bucketSize)),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Failed to update routing config." }));
+        console.error("[updateSuccessBasedRoutingConfig] API Error:", errorData.message || `HTTP ${response.status}`);
+        toast({ title: "Update Config Error", description: errorData.message || `HTTP ${response.status}`, variant: "destructive" });
       } else {
         const responseData = await response.json();
-        console.log("[updateRuleConfiguration] Response Data:", responseData);
-        toast({ title: "Rule Configuration Updated", description: "Success Rate Configuration updated successfully." });
-        
-        // Use the ID from the update SR config response to activate the routing algorithm
-        if (responseData && responseData.id) {
-          console.log("[updateRuleConfiguration] Using new routing algorithm ID from response:", responseData.id);
-          
-          // Hit volume split API before activating the rule
-          const apiKey = safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '';
-          await setVolumeSplit(merchantId, profileId, apiKey, baseUrl);
-          
-          await activateRoutingAlgorithm(responseData.id);
-        } else {
-          console.warn("[updateRuleConfiguration] No ID found in update SR config response. Cannot activate routing algorithm.");
-          toast({ title: "Activation Warning", description: "No routing algorithm ID found in response. Activation skipped.", variant: "destructive" });
-        }
+        console.log("[updateSuccessBasedRoutingConfig] Response:", responseData);
+        toast({ title: "Config Updated", description: "Success-based routing config updated." });
       }
     } catch (error: any) {
-      console.error("[updateRuleConfiguration] Fetch Error:", error);
-      toast({ title: "Rule Update Network Error", description: error.message, variant: "destructive" });
+      console.error("[updateSuccessBasedRoutingConfig] Fetch Error:", error);
+      toast({ title: "Update Config Network Error", description: error.message, variant: "destructive" });
     }
-  }, [baseUrl, toast, activateRoutingAlgorithm]);
+  }, [toast]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -233,6 +285,9 @@ export default function HomePage() {
         allCredentialsFound = false;
       }
 
+      const storedDeBaseUrl = safeLocalStorage.getItem(LOCALSTORAGE_DE_BASE_URL);
+      if (storedDeBaseUrl) setDeBaseUrl(storedDeBaseUrl);
+
       // Always open the modal on refresh
       console.log("Opening API credentials modal on page load.");
       setIsApiCredentialsModalOpen(true);
@@ -245,20 +300,19 @@ export default function HomePage() {
   }, []); // Run once on mount
 
   const handleRoutingParamsChange = useCallback((explorationPercent: number, bucketSize: number) => {
-    if (!merchantId || !profileId) {
-      console.warn("[handleRoutingParamsChange] Missing merchantId or profileId. Cannot update routing params.");
+    if (!merchantId) {
+      console.warn("[handleRoutingParamsChange] Missing merchantId. Cannot update routing params.");
       toast({ title: "Credentials Missing", description: "Enter API credentials first.", variant: "destructive" });
       return;
     }
-    const routingId = safeLocalStorage.getItem(LOCALSTORAGE_ROUTING_ID);
-    if (!routingId) {
-      console.warn("[handleRoutingParamsChange] No routing ID in localStorage. Enable Success Based Routing first.");
-      toast({ title: "Routing ID Missing", description: "Enable Success Based Routing first to generate a routing ID.", variant: "destructive" });
+    if (!ruleCreated) {
+      console.warn("[handleRoutingParamsChange] Rule not yet created. Use the Create Config button first.");
       return;
     }
-    console.log("[handleRoutingParamsChange] Updating routing params:", { explorationPercent, bucketSize, routingId });
-    updateRuleConfiguration(merchantId, profileId, explorationPercent, bucketSize, routingId);
-  }, [merchantId, profileId, updateRuleConfiguration, toast]);
+    const currentDeBaseUrl = safeLocalStorage.getItem(LOCALSTORAGE_DE_BASE_URL) || deBaseUrl;
+    console.log("[handleRoutingParamsChange] Updating routing params:", { explorationPercent, bucketSize });
+    updateSuccessBasedRoutingConfig(profileId, explorationPercent, bucketSize, currentDeBaseUrl);
+  }, [merchantId, ruleCreated, deBaseUrl, updateSuccessBasedRoutingConfig, toast]);
 
   const decideGateway = useCallback(async (
     currentControls: FormValues,
@@ -329,13 +383,13 @@ export default function HomePage() {
     };
 
     try {
-      const response = await fetch('/demo/app/api/hs-proxy/routing/evaluate', {
+      const currentDeBaseUrl = safeLocalStorage.getItem(LOCALSTORAGE_DE_BASE_URL) || deBaseUrl;
+      const response = await fetch('/demo/app/api/hs-proxy/decide-gateway', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
-          'x-base-url': safeLocalStorage.getItem(LOCALSTORAGE_BASE_URL) || 'https://sandbox.hyperswitch.io',
-          // 'x-feature': 'decision-engine'
+          'x-base-url': currentDeBaseUrl,
         },
         body: JSON.stringify(payload),
       });
@@ -424,13 +478,13 @@ export default function HomePage() {
     // console.log("[UpdateSuccessRateWindow] Payload:", JSON.stringify(payload, null, 2));
 
     try {
-      const response = await fetch('/demo/app/api/hs-proxy/routing/feedback', {
+      const currentDeBaseUrl = safeLocalStorage.getItem(LOCALSTORAGE_DE_BASE_URL) || deBaseUrl;
+      const response = await fetch('/demo/app/api/hs-proxy/update-gateway-score', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // 'x-feature': 'decision-engine'
           'x-api-key': safeLocalStorage.getItem(LOCALSTORAGE_API_KEY) || '',
-          'x-base-url': safeLocalStorage.getItem(LOCALSTORAGE_BASE_URL) || 'https://sandbox.hyperswitch.io'
+          'x-base-url': currentDeBaseUrl,
         },
         body: JSON.stringify(payload),
       });
@@ -612,59 +666,11 @@ export default function HomePage() {
     }
   };
 
-  const toggleSrRule = async (currentMerchantId: string, currentProfileId: string, currentApiKey: string, currentBaseUrl: string) => {
-    if (!currentMerchantId || !currentProfileId || !currentApiKey) {
-      toast({ title: "Error", description: "Merchant ID, Profile ID and API Key are required to toggle SR rule.", variant: "destructive" });
-      return;
-    }
-    try {
-      const response = await fetch(`${currentBaseUrl}/account/${currentMerchantId}/business_profile/${currentProfileId}/dynamic_routing/success_based/toggle?enable=dynamic_connector_selection`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'api-key': currentApiKey,
-        },
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Failed to toggle SR rule, unknown error." }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-      const responseData = await response.json();
-      console.log("Toggle SR rule response:", responseData);
-      toast({ title: "Success", description: "SR rule toggled." });
-      return responseData;
-    } catch (error: any) {
-      console.error("Error toggling SR rule:", error);
-      toast({ title: "Failed to Toggle SR Rule", description: error.message || "Could not toggle SR rule.", variant: "destructive" });
-      return null;
-    }
-  };
+  // const toggleSrRule = async (...) => { ... };
+  // Commented out — replaced by DE createMerchantAccount + createSuccessBasedRoutingConfig.
 
-  const setVolumeSplit = async (currentMerchantId: string, currentProfileId: string, currentApiKey: string, currentBaseUrl: string) => {
-    if (!currentMerchantId || !currentProfileId || !currentApiKey) {
-      toast({ title: "Error", description: "Merchant ID, Profile ID and API Key are required to set volume split.", variant: "destructive" });
-      return;
-    }
-    try {
-      const response = await fetch(`${currentBaseUrl}/account/${currentMerchantId}/business_profile/${currentProfileId}/dynamic_routing/set_volume_split?split=100`, {
-        method: 'POST',
-        headers: {
-          'api-key': currentApiKey,
-        },
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Failed to set volume split, unknown error." }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-      const responseData = await response.json();
-      console.log("Set volume split response:", responseData);
-      toast({ title: "Success", description: "Volume split set." });
-    } catch (error: any) {
-      console.error("Error setting volume split:", error);
-      toast({ title: "Failed to Set Volume Split", description: error.message || "Could not set volume split.", variant: "destructive" });
-    }
-  };
+  // const setVolumeSplit = async (...) => { ... };
+  // Commented out — no longer needed with DE integration.
 
   const handleConnectorToggleChange = useCallback(async (connectorId: string, newState: boolean) => {
     const originalState = connectorToggleStates[connectorId];
@@ -701,32 +707,20 @@ export default function HomePage() {
       toast({ title: "API Credentials Required", description: "Please enter all API credentials.", variant: "destructive" });
       return;
     }
-    
+
     setIsApiCredentialsModalOpen(false);
-    
+
     await fetchMerchantConnectors(merchantId, apiKey, baseUrl);
-    
-    const toggleResponse = await toggleSrRule(merchantId, profileId, apiKey, baseUrl);
-    
-    if (toggleResponse && toggleResponse.id) {
-      const storedRoutingId = safeLocalStorage.getItem(LOCALSTORAGE_ROUTING_ID);
-      console.log("Stored Routing ID:", storedRoutingId);
-      console.log("New Routing ID from API:", toggleResponse.id);
-      if (storedRoutingId !== toggleResponse.id) {
-        console.log("Routing ID is new. Updating local storage and calling setVolumeSplit.");
-        safeLocalStorage.setItem(LOCALSTORAGE_ROUTING_ID, toggleResponse.id);
-        await setVolumeSplit(merchantId, profileId, apiKey, baseUrl);
-      } else {
-        console.log("Routing ID is the same. Not calling setVolumeSplit.");
-      }
-    } else {
-      console.log("No id in toggle response.");
+
+    if (deBaseUrl) {
+      await createMerchantAccount(profileId, deBaseUrl);
     }
-    
+
     safeLocalStorage.setItem(LOCALSTORAGE_API_KEY, apiKey);
     safeLocalStorage.setItem(LOCALSTORAGE_PROFILE_ID, profileId);
     safeLocalStorage.setItem(LOCALSTORAGE_MERCHANT_ID, merchantId);
     safeLocalStorage.setItem(LOCALSTORAGE_BASE_URL, baseUrl);
+    safeLocalStorage.setItem(LOCALSTORAGE_DE_BASE_URL, deBaseUrl);
   };
 
   const resetSimulationState = () => {
@@ -1010,7 +1004,6 @@ export default function HomePage() {
         const connectorNameForUpdate = foundConnector
           ? `${foundConnector.connector_name}:${foundConnector.merchant_connector_id}`
           : loggedConnectorName;
-        console.log(`[FR]: Updating gateway score for connector: ${connectorNameForUpdate}, success: ${isSuccess}, payment_id: ${payment_id}`);
         await updateGatewayScore(profileId, connectorNameForUpdate, isSuccess, currentControls, payment_id);
       }
     } catch (error: any) {
@@ -1447,6 +1440,10 @@ export default function HomePage() {
                   initialValues={currentControls ?? undefined}
                   onFormChange={handleControlsChange}
                   onRoutingParamsChange={handleRoutingParamsChange}
+                  onCreateConfig={(explorationPercent, bucketSize) => {
+                    const currentDeBaseUrl = safeLocalStorage.getItem(LOCALSTORAGE_DE_BASE_URL) || deBaseUrl;
+                    createSuccessBasedRoutingConfig(profileId, explorationPercent, bucketSize, currentDeBaseUrl);
+                  }}
                   merchantConnectors={merchantConnectors}
                   connectorToggleStates={connectorToggleStates}
                   onConnectorToggleChange={handleConnectorToggleChange}
@@ -1562,8 +1559,12 @@ export default function HomePage() {
             <div><Label htmlFor="profileId">Profile ID</Label><Input id="profileId" type="text" value={profileId} onChange={(e) => setProfileId(e.target.value)} placeholder="Enter Profile ID" /></div>
             <div><Label htmlFor="merchantId">Merchant ID</Label><Input id="merchantId" type="text" value={merchantId} onChange={(e) => setMerchantId(e.target.value)} placeholder="Enter Merchant ID" /></div>
             <div>
-              <Label htmlFor="baseUrl">Base URL</Label>
+              <Label htmlFor="baseUrl">Hyperswitch Base URL</Label>
               <Input id="baseUrl" type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Enter Base URL (e.g., https://sandbox.hyperswitch.io)" />
+            </div>
+            <div>
+              <Label htmlFor="deBaseUrl">Decision Engine URL</Label>
+              <Input id="deBaseUrl" type="text" value={deBaseUrl} onChange={(e) => setDeBaseUrl(e.target.value)} placeholder="Enter Decision Engine URL (e.g., http://localhost:8080)" />
             </div>
           </div>
           <DialogFooter>
